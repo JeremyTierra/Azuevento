@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: azuevento-postgres
+    environment:
+      POSTGRES_DB: community_events
+      POSTGRES_USER: azuevento_user
+      POSTGRES_PASSWORD: azuevento_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    networks:
+      - azuevento-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U azuevento_user -d community_events"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./eventos-comunitarios-api
+      dockerfile: Dockerfile
+    container_name: azuevento-api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/community_events
+      SPRING_DATASOURCE_USERNAME: azuevento_user
+      SPRING_DATASOURCE_PASSWORD: azuevento_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - azuevento-network
+
+volumes:
+  postgres_data:
+
+networks:
+  azuevento-network:
+    driver: bridge
