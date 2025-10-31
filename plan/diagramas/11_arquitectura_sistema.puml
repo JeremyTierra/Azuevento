@@ -6,12 +6,12 @@ skinparam packageBackgroundColor #FFFFFF
 skinparam componentBackgroundColor #FEFECE
 skinparam databaseBackgroundColor #FEFECE
 
-title Arquitectura del Sistema - Aplicación de Eventos Comunitarios
+title Arquitectura del Sistema - Aplicacion de Eventos Comunitarios
 
-package "Capa de Presentación" <<Cloud>> #E3F2FD {
-    package "Aplicación Móvil (React Native / Expo)" #BBDEFB {
-        [Navegación\n(React Navigation)] as Navigation
-        [Contexto de\nAutenticación] as AuthContext
+package "Capa de Presentacion" <<Cloud>> #E3F2FD {
+    package "Aplicacion Movil (React Native / Expo)" #BBDEFB {
+        [Navegacion\n(React Navigation)] as Navigation
+        [Contexto de\nAutenticacion] as AuthContext
         [Servicios HTTP\n(API Client)] as Services
         [Componentes UI] as Components
     }
@@ -25,7 +25,7 @@ package "Capa de Servicios" <<Frame>> #E8F5E9 {
         [Seguridad\n(JWT Filter)] as Security
     }
 
-    [Swagger / OpenAPI\nDocumentación] as Swagger
+    [Swagger / OpenAPI\nDocumentacion] as Swagger
 }
 
 package "Capa de Datos" <<Database>> #FFF9C4 {
@@ -33,14 +33,14 @@ package "Capa de Datos" <<Database>> #FFF9C4 {
 }
 
 package "Servicios Externos" <<Rectangle>> #FCE4EC {
-    [Google Maps / Apple Maps\n(Navegación externa)] as ExternalMaps
+    [Google Maps / Apple Maps\n(Navegacion externa)] as ExternalMaps
     [API Nativa de\nCompartir (Share)] as ShareAPI
 }
 
 ' Conexiones entre capas
 Services --> Controllers : HTTPS / REST\nJSON
 Repositories --> DB : JDBC /\nSpring Data
-Controllers --> Swagger : Genera\ndocumentación
+Controllers --> Swagger : Genera\ndocumentacion
 
 ' Conexiones internas - Presentación
 Navigation --> AuthContext
@@ -54,7 +54,7 @@ BusinessServices --> Repositories
 
 ' Conexiones externas
 Navigation --> ExternalMaps : Deep Link\n(lat/lng)
-Components --> ShareAPI : Invocación\nnativa
+Components --> ShareAPI : Invocacion\nnativa
 
 note right of DB
   **Tablas principales:**
@@ -63,10 +63,10 @@ note right of DB
   comments, ratings,
   user_interests
 
-  **Características:**
-  * Borrado lógico (soft delete)
+  **Caracteristicas:**
+  * Borrado logico (soft delete)
   * Restricciones de integridad
-  * Timestamps automáticos
+  * Timestamps automaticos
 end note
 
 note bottom of Security

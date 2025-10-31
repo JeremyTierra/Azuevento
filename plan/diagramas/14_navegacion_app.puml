@@ -3,11 +3,11 @@ skinparam stateBackgroundColor #FEFECE
 skinparam stateBorderColor #A80036
 skinparam arrowColor #A80036
 
-title Diagrama de Navegación - Estructura de la Aplicación Móvil
+title Diagrama de Navegacion - Estructura de la Aplicacion Movil
 
-state "Aplicación" as App {
+state "Aplicacion" as App {
 
-    state "Stack de Autenticación" as AuthStack {
+    state "Stack de Autenticacion" as AuthStack {
         state "Pantalla de Login" as Login
         state "Pantalla de Registro" as Register
 
@@ -26,7 +26,7 @@ state "Aplicación" as App {
             state "Crear Evento" as CreateEvent1
             state "Comentarios" as Comments1
             state "Mi Entrada (QR)" as MyTicket1
-            state "Escáner QR" as Scanner1
+            state "Escaner QR" as Scanner1
 
             [*] --> ExploreHome
             ExploreHome --> EventDetail1 : Ver evento
@@ -42,7 +42,7 @@ state "Aplicación" as App {
             state "Crear Evento" as CreateEvent2
             state "Comentarios" as Comments2
             state "Mi Entrada (QR)" as MyTicket2
-            state "Escáner QR" as Scanner2
+            state "Escaner QR" as Scanner2
 
             [*] --> MyEventsList
             MyEventsList --> EventDetail2 : Ver evento
@@ -65,34 +65,34 @@ state "Aplicación" as App {
         state "Tab: Perfil" as ProfileTab {
             state "Mi Perfil" as ProfileMain
             state "Editar Perfil" as EditProfile
-            state "Cambiar Contraseña" as ChangePassword
+            state "Cambiar Contrasena" as ChangePassword
 
             [*] --> ProfileMain
             ProfileMain --> EditProfile : Editar
-            ProfileMain --> ChangePassword : Cambiar contraseña
+            ProfileMain --> ChangePassword : Cambiar contrasena
             EditProfile --> ProfileMain : Guardar/Cancelar
             ChangePassword --> ProfileMain : Guardar/Cancelar
         }
     }
 
     [*] --> AuthStack : Usuario no autenticado
-    AuthStack --> TabNav : Autenticación exitosa
-    TabNav --> AuthStack : Cerrar sesión
+    AuthStack --> TabNav : Autenticacion exitosa
+    TabNav --> AuthStack : Cerrar sesion
 }
 
 note right of TabNav
-  **Navegación por Tabs:**
+  **Navegacion por Tabs:**
   4 tabs principales en la parte
   inferior de la pantalla.
 
   Cada tab tiene su propio
-  stack de navegación.
+  stack de navegacion.
 end note
 
 note bottom of ExploreTab
   **Pantalla principal:**
-  Lista de eventos públicos
-  con búsqueda y filtros
+  Lista de eventos publicos
+  con busqueda y filtros
 end note
 
 note bottom of MyEventsTab
@@ -105,7 +105,7 @@ end note
 note bottom of MapTab
   **Funcionalidades:**
   * Marcadores de eventos
-  * Integración con mapas externos
+  * Integracion con mapas externos
   * Vista de resumen al seleccionar
 end note
 

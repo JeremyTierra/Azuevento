@@ -3,7 +3,7 @@ skinparam linetype ortho
 skinparam classBackgroundColor #FEFECE
 skinparam classBorderColor #A80036
 
-title Diagrama Entidad-Relación - Base de Datos del Sistema
+title Diagrama Entidad-Relacion - Base de Datos del Sistema
 
 entity "users" as users {
     * **id** : BIGSERIAL <<PK>>

@@ -6,7 +6,7 @@ skinparam maxMessageSize 200
 title Diagrama de Secuencia - Registro de Asistencia a Evento
 
 actor "Usuario" as User
-participant "App Móvil\n(React Native)" as App
+participant "App Movil\n(React Native)" as App
 participant "API REST\n(Spring Boot)" as API
 database "PostgreSQL" as DB
 
@@ -64,7 +64,7 @@ DB --> API: null (no existe)
 deactivate DB
 
 alt Ya registrado
-    API --> App: 400 Bad Request\n"Ya está registrado"
+    API --> App: 400 Bad Request\n"Ya esta registrado"
 end
 
 API -> DB: SELECT COUNT(*), max_capacity\nFROM events e\nLEFT JOIN participants p\nON e.id = p.event_id\nWHERE e.id = {eventId}
@@ -83,13 +83,13 @@ activate DB
 DB --> API: Participant created
 deactivate DB
 
-API --> App: 200 OK\n{message: "Inscripción exitosa"}
+API --> App: 200 OK\n{message: "Inscripcion exitosa"}
 deactivate API
 
-App --> User: Mostrar confirmación\ny botón "Mi Entrada"
+App --> User: Mostrar confirmacion\ny boton "Mi Entrada"
 deactivate App
 
-== Cancelación de Asistencia ==
+== Cancelacion de Asistencia ==
 
 User -> App: Pulsar "Cancelar asistencia"
 activate App

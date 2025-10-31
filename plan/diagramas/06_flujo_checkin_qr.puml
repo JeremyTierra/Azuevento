@@ -6,12 +6,12 @@ skinparam activityDiamondBorderColor #A80036
 skinparam arrowColor #A80036
 skinparam swimlaneWidth 200
 
-title Diagrama de Actividades - Sistema de Check-in con Código QR
+title Diagrama de Actividades - Sistema de Check-in con Codigo QR
 
 |Participante|
 start
 
-partition "Generación de Entrada" {
+partition "Generacion de Entrada" {
     :Acceder a evento inscrito;
     :Seleccionar "Mi Entrada";
 
@@ -22,18 +22,18 @@ partition "Generación de Entrada" {
     note right
       El token se genera al inscribirse
       con SecureRandom + Base64
-      (64 caracteres, único)
+      (64 caracteres, unico)
     end note
 
     |Participante|
     :Visualizar pantalla de entrada;
     note right
       La entrada muestra:
-      * Título del evento
+      * Titulo del evento
       * Fecha y hora
-      * Ubicación
+      * Ubicacion
       * Nombre del participante
-      * Código QR con checkin_token
+      * Codigo QR con checkin_token
     end note
 }
 
@@ -44,25 +44,25 @@ partition "Proceso de Check-in" {
     :Seleccionar "Escanear QR";
 
     |Sistema|
-    :Activar cámara del dispositivo;
+    :Activar camara del dispositivo;
 
     |Organizador|
-    :Apuntar cámara al código QR;
+    :Apuntar camara al codigo QR;
 
     |Participante|
-    :Presentar código QR de entrada;
+    :Presentar codigo QR de entrada;
 
     |Sistema|
-    :Decodificar código QR;
+    :Decodificar codigo QR;
     :Extraer checkin_token;
     :POST /api/events/{eventId}/checkin;
     :Verificar que el usuario es organizador;
     :Buscar participante por\nevent_id + checkin_token;
 
-    if (¿Participante encontrado?) then (sí)
+    if (¿Participante encontrado?) then (si)
         :Verificar estado de check-in;
 
-        if (¿Ya hizo check-in?) then (sí)
+        if (¿Ya hizo check-in?) then (si)
             |Organizador|
             #Orange:Mostrar alerta\n"Ya registrado anteriormente";
             :Mostrar hora de check-in previo;
@@ -72,15 +72,15 @@ partition "Proceso de Check-in" {
             :Registrar checked_in_at = NOW();
 
             |Organizador|
-            #LightGreen:Mostrar confirmación exitosa;
+            #LightGreen:Mostrar confirmacion exitosa;
             :Mostrar nombre del participante;
         endif
     else (no)
         |Organizador|
-        #Red:Mostrar error\n"Código QR inválido o\nno pertenece a este evento";
+        #Red:Mostrar error\n"Codigo QR invalido o\nno pertenece a este evento";
     endif
 
-    if (¿Más participantes?) then (sí)
+    if (¿Mas participantes?) then (si)
         :Volver a escanear;
     else (no)
         :Finalizar proceso;

@@ -5,18 +5,18 @@ skinparam activityDiamondBackgroundColor #FEFECE
 skinparam activityDiamondBorderColor #A80036
 skinparam arrowColor #A80036
 
-title Diagrama de Actividades - Flujo de Autenticación
+title Diagrama de Actividades - Flujo de Autenticacion
 
 |Usuario|
 start
 
-:Abrir aplicación;
+:Abrir aplicacion;
 
 |Sistema|
 :Leer token y datos de usuario\ndesde almacenamiento local\n(AsyncStorage);
 
-if (¿Existen datos almacenados?) then (sí)
-    :Restaurar sesión localmente;
+if (¿Existen datos almacenados?) then (si)
+    :Restaurar sesion localmente;
 
     |Usuario|
     :Acceder a pantalla principal;
@@ -26,14 +26,14 @@ else (no)
     :Mostrar pantalla de login;
 endif
 
-if (¿Usuario registrado?) then (sí)
-    :Ingresar credenciales\n(email, contraseña);
+if (¿Usuario registrado?) then (si)
+    :Ingresar credenciales\n(email, contrasena);
 
     |Sistema|
     :POST /api/auth/login;
     :Autenticar con AuthenticationManager;
 
-    if (¿Credenciales válidas?) then (sí)
+    if (¿Credenciales validas?) then (si)
         :Generar token JWT;
         :Retornar AuthResponse\n(token, userId, name, email, role);
 
@@ -51,15 +51,15 @@ if (¿Usuario registrado?) then (sí)
     endif
 else (no)
     :Navegar a registro;
-    :Ingresar datos de registro\n(nombre, email, contraseña);
+    :Ingresar datos de registro\n(nombre, email, contrasena);
 
     |Sistema|
     :POST /api/auth/register;
     :Verificar email disponible;
 
-    if (¿Email disponible?) then (sí)
+    if (¿Email disponible?) then (si)
         :Crear cuenta de usuario;
-        :Encriptar contraseña (BCrypt);
+        :Encriptar contrasena (BCrypt);
         :Generar token JWT;
         :Retornar AuthResponse\n(token, userId, name, email, role);
 

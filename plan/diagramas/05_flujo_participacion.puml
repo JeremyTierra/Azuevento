@@ -12,38 +12,38 @@ start
 
 :Explorar eventos disponibles;
 
-:Seleccionar evento de interés;
+:Seleccionar evento de interes;
 
 |Sistema|
 :Cargar detalle del evento;
 :Verificar estado del evento;
 
-if (¿Estado = PUBLISHED?) then (sí)
+if (¿Estado = PUBLISHED?) then (si)
     |Participante|
-    :Visualizar información del evento;
+    :Visualizar informacion del evento;
 
-    if (¿Usuario autenticado?) then (sí)
+    if (¿Usuario autenticado?) then (si)
         |Sistema|
         :Verificar registro previo;
 
-        if (¿Ya está registrado?) then (sí)
+        if (¿Ya esta registrado?) then (si)
             |Participante|
-            :Mostrar opción "Cancelar asistencia";
+            :Mostrar opcion "Cancelar asistencia";
 
-            if (¿Desea cancelar?) then (sí)
+            if (¿Desea cancelar?) then (si)
                 |Sistema|
                 :Actualizar estado a CANCELLED;
                 :Decrementar contador de participantes;
 
                 |Participante|
-                :Confirmar cancelación;
+                :Confirmar cancelacion;
             else (no)
                 :Mantener registro;
             endif
         else (no)
-            :Mostrar botón "Inscribirse";
+            :Mostrar boton "Inscribirse";
 
-            if (¿Desea inscribirse?) then (sí)
+            if (¿Desea inscribirse?) then (si)
                 |Sistema|
                 :Crear registro de participante;
                 :Generar checkin_token (UUID);
@@ -51,24 +51,24 @@ if (¿Estado = PUBLISHED?) then (sí)
                 :Incrementar contador de participantes;
 
                 |Participante|
-                :Confirmar inscripción exitosa;
+                :Confirmar inscripcion exitosa;
                 :Habilitar acceso a "Mi Entrada";
             else (no)
                 :Continuar explorando;
             endif
         endif
     else (no)
-        :Mostrar mensaje\n"Inicia sesión para inscribirte";
+        :Mostrar mensaje\n"Inicia sesion para inscribirte";
         :Redirigir a login;
     endif
 else (no)
     |Participante|
-    if (¿Estado = CANCELLED?) then (sí)
+    if (¿Estado = CANCELLED?) then (si)
         :Mostrar banner "Evento cancelado";
     else (ARCHIVED)
         :Mostrar banner "Evento finalizado";
     endif
-    :Deshabilitar inscripción;
+    :Deshabilitar inscripcion;
 endif
 
 stop

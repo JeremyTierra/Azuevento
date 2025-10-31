@@ -5,7 +5,7 @@ skinparam activityDiamondBackgroundColor #FEFECE
 skinparam activityDiamondBorderColor #A80036
 skinparam arrowColor #A80036
 
-title Diagrama de Actividades - Gestión del Ciclo de Vida de Eventos
+title Diagrama de Actividades - Gestion del Ciclo de Vida de Eventos
 
 |Organizador|
 start
@@ -14,21 +14,21 @@ start
 
 :Ingresar datos del evento;
 note right
-  * Título
-  * Descripción
+  * Titulo
+  * Descripcion
   * Fecha/hora inicio y fin
-  * Ubicación (texto)
+  * Ubicacion (texto)
   * Coordenadas (lat/lng)
-  * Categoría
-  * Capacidad máxima
+  * Categoria
+  * Capacidad maxima
   * Imagen de portada
-  * Visibilidad (público/privado)
+  * Visibilidad (publico/privado)
 end note
 
 |Sistema|
 :Validar datos obligatorios;
 
-if (¿Datos válidos?) then (sí)
+if (¿Datos validos?) then (si)
     :Crear evento con estado DRAFT;
     :Asignar organizador;
     :Almacenar en base de datos;
@@ -36,33 +36,33 @@ if (¿Datos válidos?) then (sí)
     |Organizador|
     :Mostrar evento creado;
 
-    if (¿Publicar ahora?) then (sí)
+    if (¿Publicar ahora?) then (si)
         |Sistema|
-        :Validar requisitos de publicación;
+        :Validar requisitos de publicacion;
         note right
           * Fecha futura
-          * Ubicación válida
+          * Ubicacion valida
           * Campos completos
         end note
 
-        if (¿Cumple requisitos?) then (sí)
+        if (¿Cumple requisitos?) then (si)
             :Cambiar estado a PUBLISHED;
-            :Evento visible públicamente;
+            :Evento visible publicamente;
 
             |Organizador|
-            :Confirmar publicación exitosa;
+            :Confirmar publicacion exitosa;
         else (no)
             |Organizador|
-            :Mostrar errores de validación;
+            :Mostrar errores de validacion;
             :Mantener como DRAFT;
         endif
     else (no)
         :Mantener como borrador;
-        :Evento guardado para edición posterior;
+        :Evento guardado para edicion posterior;
     endif
 else (no)
     |Organizador|
-    :Mostrar errores de validación;
+    :Mostrar errores de validacion;
     :Corregir datos;
 endif
 
@@ -70,9 +70,9 @@ fork
     :Editar evento;
 
     |Sistema|
-    :Verificar permisos de edición;
+    :Verificar permisos de edicion;
 
-    if (¿Es organizador?) then (sí)
+    if (¿Es organizador?) then (si)
         :Permitir modificaciones;
         :Actualizar evento;
     else (no)
@@ -83,7 +83,7 @@ fork again
     :Cancelar evento;
 
     |Sistema|
-    if (¿Estado = PUBLISHED?) then (sí)
+    if (¿Estado = PUBLISHED?) then (si)
         :Cambiar estado a CANCELLED;
         :Bloquear nuevas inscripciones;
         :Conservar participantes registrados;
@@ -98,9 +98,9 @@ fork again
     :Archivar evento;
 
     |Sistema|
-    if (¿Estado = PUBLISHED o CANCELLED?) then (sí)
+    if (¿Estado = PUBLISHED o CANCELLED?) then (si)
         :Cambiar estado a ARCHIVED;
-        :Evento ya no visible en exploración;
+        :Evento ya no visible en exploracion;
 
         |Organizador|
         :Evento archivado;
@@ -112,7 +112,7 @@ fork again
     :Eliminar evento;
 
     |Sistema|
-    :Aplicar borrado lógico;
+    :Aplicar borrado logico;
     :Establecer deleted_at = NOW();
     :Evento oculto de todos los listados;
 

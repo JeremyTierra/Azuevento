@@ -5,12 +5,12 @@ skinparam activityDiamondBackgroundColor #FEFECE
 skinparam activityDiamondBorderColor #A80036
 skinparam arrowColor #A80036
 
-title Diagrama de Actividades - Gestión de Perfil de Usuario
+title Diagrama de Actividades - Gestion de Perfil de Usuario
 
 |Usuario|
 start
 
-:Acceder a sección "Perfil";
+:Acceder a seccion "Perfil";
 
 |Sistema|
 :Cargar datos del usuario actual;
@@ -19,11 +19,11 @@ start
 |Usuario|
 :Visualizar perfil;
 note right
-  Información mostrada:
+  Informacion mostrada:
   * Nombre
   * Email
-  * Descripción
-  * Intereses (categorías)
+  * Descripcion
+  * Intereses (categorias)
   * Foto de perfil
 end note
 
@@ -40,8 +40,8 @@ partition "Editar Perfil" #LightYellow {
     note right
       Campos editables:
       * Nombre
-      * Teléfono
-      * Descripción
+      * Telefono
+      * Descripcion
       * Foto de perfil
     end note
 
@@ -50,16 +50,16 @@ partition "Editar Perfil" #LightYellow {
     |Sistema|
     :Validar datos de entrada;
 
-    if (¿Datos válidos?) then (sí)
+    if (¿Datos validos?) then (si)
         :Actualizar registro en base de datos;
         :Retornar perfil actualizado;
 
         |Usuario|
-        :Mostrar confirmación de éxito;
+        :Mostrar confirmacion de exito;
         :Actualizar vista del perfil;
     else (no)
         |Usuario|
-        :Mostrar errores de validación;
+        :Mostrar errores de validacion;
         :Corregir datos;
     endif
 }
@@ -67,15 +67,15 @@ partition "Editar Perfil" #LightYellow {
 fork again
 
 partition "Gestionar Intereses" #LightBlue {
-    :Acceder a selección de intereses;
+    :Acceder a seleccion de intereses;
 
     |Sistema|
-    :Cargar lista de categorías;
-    :Marcar categorías ya seleccionadas;
+    :Cargar lista de categorias;
+    :Marcar categorias ya seleccionadas;
 
     |Usuario|
-    :Seleccionar/deseleccionar categorías;
-    :Confirmar selección;
+    :Seleccionar/deseleccionar categorias;
+    :Confirmar seleccion;
 
     |Sistema|
     :Actualizar tabla user_interests;
@@ -87,53 +87,53 @@ partition "Gestionar Intereses" #LightBlue {
 
 fork again
 
-partition "Cambiar Contraseña" #LightGreen {
-    :Seleccionar "Cambiar contraseña";
+partition "Cambiar Contrasena" #LightGreen {
+    :Seleccionar "Cambiar contrasena";
 
     |Sistema|
     :Mostrar formulario de cambio;
 
     |Usuario|
-    :Ingresar contraseña actual;
-    :Ingresar nueva contraseña;
-    :Confirmar nueva contraseña;
+    :Ingresar contrasena actual;
+    :Ingresar nueva contrasena;
+    :Confirmar nueva contrasena;
     :Enviar solicitud;
 
     |Sistema|
-    :Verificar contraseña actual;
+    :Verificar contrasena actual;
 
-    if (¿Contraseña actual correcta?) then (sí)
-        :Validar nueva contraseña;
+    if (¿Contrasena actual correcta?) then (si)
+        :Validar nueva contrasena;
 
-        if (¿Nueva contraseña válida?) then (sí)
-            if (¿Coinciden las contraseñas?) then (sí)
-                :Encriptar nueva contraseña (BCrypt);
+        if (¿Nueva contrasena valida?) then (si)
+            if (¿Coinciden las contrasenas?) then (si)
+                :Encriptar nueva contrasena (BCrypt);
                 :Actualizar password_hash;
 
                 |Usuario|
-                :Mostrar confirmación de éxito;
+                :Mostrar confirmacion de exito;
             else (no)
                 |Usuario|
-                :Mostrar error\n"Las contraseñas no coinciden";
+                :Mostrar error\n"Las contrasenas no coinciden";
             endif
         else (no)
             |Usuario|
-            :Mostrar requisitos de contraseña;
+            :Mostrar requisitos de contrasena;
         endif
     else (no)
         |Usuario|
-        :Mostrar error\n"Contraseña actual incorrecta";
+        :Mostrar error\n"Contrasena actual incorrecta";
     endif
 }
 
 fork again
 
-partition "Cerrar Sesión" #LightPink {
-    :Seleccionar "Cerrar sesión";
+partition "Cerrar Sesion" #LightPink {
+    :Seleccionar "Cerrar sesion";
 
     |Sistema|
     :Eliminar token JWT almacenado;
-    :Limpiar estado de autenticación;
+    :Limpiar estado de autenticacion;
 
     |Usuario|
     :Redirigir a pantalla de login;

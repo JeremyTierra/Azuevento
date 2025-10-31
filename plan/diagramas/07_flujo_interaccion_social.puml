@@ -5,7 +5,7 @@ skinparam activityDiamondBackgroundColor #FEFECE
 skinparam activityDiamondBorderColor #A80036
 skinparam arrowColor #A80036
 
-title Diagrama de Actividades - Interacción Social en Eventos
+title Diagrama de Actividades - Interaccion Social en Eventos
 
 |Usuario|
 start
@@ -14,18 +14,18 @@ start
 
 fork
 
-partition "Gestión de Favoritos" #LightYellow {
+partition "Gestion de Favoritos" #LightYellow {
     :Pulsar icono de favorito;
 
     |Sistema|
     :Verificar estado actual;
 
-    if (¿Es favorito?) then (sí)
+    if (¿Es favorito?) then (si)
         :Eliminar de favoritos;
         :Decrementar contador;
 
         |Usuario|
-        :Actualizar icono (vacío);
+        :Actualizar icono (vacio);
     else (no)
         :Agregar a favoritos;
         :Incrementar contador;
@@ -40,7 +40,7 @@ partition "Gestión de Favoritos" #LightYellow {
 fork again
 
 partition "Sistema de Comentarios" #LightBlue {
-    :Acceder a sección de comentarios;
+    :Acceder a seccion de comentarios;
 
     |Sistema|
     :Cargar comentarios del evento;
@@ -49,7 +49,7 @@ partition "Sistema de Comentarios" #LightBlue {
     |Usuario|
     :Visualizar comentarios existentes;
 
-    if (¿Desea comentar?) then (sí)
+    if (¿Desea comentar?) then (si)
         :Escribir comentario;
         :Enviar comentario;
 
@@ -64,7 +64,7 @@ partition "Sistema de Comentarios" #LightBlue {
         :Continuar lectura;
     endif
 
-    if (¿Es autor del comentario?) then (sí)
+    if (¿Es autor del comentario?) then (si)
         fork
             :Editar comentario;
 
@@ -87,52 +87,52 @@ partition "Sistema de Valoraciones" #LightGreen {
     :Verificar elegibilidad para valorar;
 
     |Sistema|
-    if (¿Está autenticado?) then (sí)
-        :Habilitar opción de valoración;
+    if (¿Esta autenticado?) then (si)
+        :Habilitar opcion de valoracion;
 
         |Usuario|
-        :Seleccionar calificación (1-5 estrellas);
+        :Seleccionar calificacion (1-5 estrellas);
 
         |Sistema|
-        :Verificar valoración previa;
+        :Verificar valoracion previa;
 
-        if (¿Ya valoró?) then (sí)
-            :Actualizar valoración existente;
+        if (¿Ya valoro?) then (si)
+            :Actualizar valoracion existente;
         else (no)
-            :Crear nueva valoración;
+            :Crear nueva valoracion;
         endif
 
         :Recalcular promedio del evento;
         :Actualizar contador de valoraciones;
 
         |Usuario|
-        :Mostrar confirmación;
+        :Mostrar confirmacion;
         :Actualizar promedio visible;
     else (no)
         |Usuario|
-        :Mostrar mensaje\n"Inicia sesión para valorar";
+        :Mostrar mensaje\n"Inicia sesion para valorar";
     endif
 }
 
 fork again
 
 partition "Compartir Evento" #LightPink {
-    :Pulsar botón compartir;
+    :Pulsar boton compartir;
 
     |Sistema|
     :Generar contenido para compartir;
     note right
       Contenido incluye:
-      * Título del evento
+      * Titulo del evento
       * Fecha y hora
-      * Ubicación
-      * Descripción breve
+      * Ubicacion
+      * Descripcion breve
     end note
 
     :Invocar API nativa de compartir;
 
     |Usuario|
-    :Seleccionar aplicación destino;
+    :Seleccionar aplicacion destino;
     :Enviar contenido;
 }
 

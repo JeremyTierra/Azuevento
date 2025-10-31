@@ -3,7 +3,7 @@ skinparam sequenceMessageAlign center
 skinparam responseMessageBelowArrow true
 skinparam maxMessageSize 200
 
-title Diagrama de Secuencia - Check-in mediante Código QR
+title Diagrama de Secuencia - Check-in mediante Codigo QR
 
 actor "Participante" as Participant
 actor "Organizador" as Organizer
@@ -12,7 +12,7 @@ participant "App Organizador\n(React Native)" as AppO
 participant "API REST\n(Spring Boot)" as API
 database "PostgreSQL" as DB
 
-== Generación de Entrada QR ==
+== Generacion de Entrada QR ==
 
 Participant -> AppP: Acceder a "Mi Entrada"
 activate AppP
@@ -30,9 +30,9 @@ deactivate DB
 API --> AppP: TicketResponse\n{eventTitle, userName,\ncheckinToken, status}
 deactivate API
 
-AppP -> AppP: Generar código QR\ncon checkin_token
+AppP -> AppP: Generar codigo QR\ncon checkin_token
 
-AppP --> Participant: Mostrar entrada\ncon código QR
+AppP --> Participant: Mostrar entrada\ncon codigo QR
 deactivate AppP
 
 == Proceso de Check-in ==
@@ -40,10 +40,10 @@ deactivate AppP
 Organizer -> AppO: Acceder a "Escanear"
 activate AppO
 
-AppO -> AppO: Activar cámara
-AppO --> Organizer: Mostrar visor de cámara
+AppO -> AppO: Activar camara
+AppO --> Organizer: Mostrar visor de camara
 
-Participant -> Organizer: Presentar código QR
+Participant -> Organizer: Presentar codigo QR
 
 AppO -> AppO: Detectar y decodificar QR
 AppO -> AppO: Extraer checkin_token
@@ -68,7 +68,7 @@ DB --> API: Participant data
 deactivate DB
 
 alt Token no encontrado
-    API --> AppO: 404 Not Found\n"Código QR inválido"
+    API --> AppO: 404 Not Found\n"Codigo QR invalido"
 end
 
 alt Ya hizo check-in
@@ -83,7 +83,7 @@ deactivate DB
 API --> AppO: CheckinResponse\n{success: true,\nuserName: "...",\ncheckedInAt: "..."}
 deactivate API
 
-AppO --> Organizer: Mostrar confirmación\ncon nombre del participante
+AppO --> Organizer: Mostrar confirmacion\ncon nombre del participante
 deactivate AppO
 
 == Consulta de Lista de Asistencia ==

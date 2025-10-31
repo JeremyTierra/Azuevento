@@ -3,10 +3,10 @@ skinparam sequenceMessageAlign center
 skinparam responseMessageBelowArrow true
 skinparam maxMessageSize 200
 
-title Diagrama de Secuencia - Autenticación de Usuario
+title Diagrama de Secuencia - Autenticacion de Usuario
 
 actor "Usuario" as User
-participant "App Móvil\n(React Native)" as App
+participant "App Movil\n(React Native)" as App
 participant "AuthContext" as Context
 participant "API REST\n(Spring Boot)" as API
 participant "JwtTokenProvider" as JWT
@@ -27,7 +27,7 @@ activate DB
 DB --> API: null (no existe)
 deactivate DB
 
-API -> API: Encriptar contraseña\n(BCrypt)
+API -> API: Encriptar contrasena\n(BCrypt)
 
 API -> DB: INSERT INTO users\n(name, email, password_hash, role, ...)\nVALUES (...)
 activate DB
@@ -51,7 +51,7 @@ deactivate Context
 App --> User: Redirigir a pantalla principal
 deactivate App
 
-== Inicio de Sesión ==
+== Inicio de Sesion ==
 
 User -> App: Ingresar credenciales
 activate App
@@ -65,13 +65,13 @@ DB --> API: User data
 deactivate DB
 
 alt Usuario no encontrado
-    API --> App: 401 Unauthorized\n"Credenciales inválidas"
+    API --> App: 401 Unauthorized\n"Credenciales invalidas"
 end
 
-API -> API: Verificar contraseña\n(BCrypt.matches)
+API -> API: Verificar contrasena\n(BCrypt.matches)
 
-alt Contraseña incorrecta
-    API --> App: 401 Unauthorized\n"Credenciales inválidas"
+alt Contrasena incorrecta
+    API --> App: 401 Unauthorized\n"Credenciales invalidas"
 end
 
 API -> JWT: generateToken(userId, email)
@@ -90,7 +90,7 @@ deactivate Context
 App --> User: Redirigir a pantalla principal
 deactivate App
 
-== Verificación de Token (al abrir app) ==
+== Verificacion de Token (al abrir app) ==
 
 User -> App: Abrir aplicación
 activate App
@@ -111,7 +111,7 @@ activate API
 API -> JWT: validateToken(token)
 activate JWT
 
-alt Token expirado o inválido
+alt Token expirado o invalido
     JWT --> API: Invalid
     API --> Context: 401 Unauthorized
     Context -> Context: Limpiar token almacenado
@@ -136,9 +136,9 @@ deactivate Context
 App --> User: Mostrar pantalla principal
 deactivate App
 
-== Cierre de Sesión ==
+== Cierre de Sesion ==
 
-User -> App: Pulsar "Cerrar sesión"
+User -> App: Pulsar "Cerrar sesion"
 activate App
 
 App -> Context: logout()
@@ -146,7 +146,7 @@ activate Context
 
 Context -> Context: Eliminar token de AsyncStorage
 Context -> Context: Limpiar estado de usuario
-Context --> App: Sesión cerrada
+Context --> App: Sesion cerrada
 deactivate Context
 
 App --> User: Redirigir a login

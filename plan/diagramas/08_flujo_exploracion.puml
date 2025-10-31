@@ -5,21 +5,21 @@ skinparam activityDiamondBackgroundColor #FEFECE
 skinparam activityDiamondBorderColor #A80036
 skinparam arrowColor #A80036
 
-title Diagrama de Actividades - Exploración y Descubrimiento de Eventos
+title Diagrama de Actividades - Exploracion y Descubrimiento de Eventos
 
 |Usuario|
 start
 
-:Acceder a pantalla de exploración;
+:Acceder a pantalla de exploracion;
 
 |Sistema|
-:Consultar eventos públicos;
+:Consultar eventos publicos;
 note right
   Filtros aplicados:
   * visibility = PUBLIC
   * status = PUBLISHED
   * deleted_at = NULL
-  * Ordenados por fecha (próximos primero)
+  * Ordenados por fecha (proximos primero)
 end note
 
 :Retornar lista de eventos;
@@ -29,15 +29,15 @@ end note
 
 fork
 
-partition "Búsqueda por Texto" #LightYellow {
-    :Ingresar término de búsqueda;
+partition "Busqueda por Texto" #LightYellow {
+    :Ingresar termino de busqueda;
 
     |Sistema|
     :Filtrar por coincidencia en:
-    - Título
-    - Descripción
-    - Ubicación
-    - Categoría;
+    - Titulo
+    - Descripcion
+    - Ubicacion
+    - Categoria;
 
     :Actualizar resultados;
 
@@ -47,17 +47,17 @@ partition "Búsqueda por Texto" #LightYellow {
 
 fork again
 
-partition "Filtrado por Categoría" #LightBlue {
-    :Seleccionar categoría;
+partition "Filtrado por Categoria" #LightBlue {
+    :Seleccionar categoria;
 
     |Sistema|
     :Filtrar eventos por category_id;
     :Actualizar resultados;
 
     |Usuario|
-    :Visualizar eventos de categoría;
+    :Visualizar eventos de categoria;
 
-    if (¿Seleccionar otra categoría?) then (sí)
+    if (¿Seleccionar otra categoria?) then (si)
         :Cambiar filtro de categoría;
     else (no)
         :Limpiar filtro (ver todos);
@@ -66,32 +66,32 @@ partition "Filtrado por Categoría" #LightBlue {
 
 fork again
 
-partition "Visualización en Mapa" #LightGreen {
+partition "Visualizacion en Mapa" #LightGreen {
     :Cambiar a vista de mapa;
 
     |Sistema|
     :Obtener eventos con coordenadas;
-    :Generar marcadores geográficos;
+    :Generar marcadores geograficos;
 
     |Usuario|
     :Visualizar mapa con marcadores;
     :Navegar por el mapa;
 
-    if (¿Seleccionar marcador?) then (sí)
+    if (¿Seleccionar marcador?) then (si)
         |Sistema|
         :Mostrar resumen del evento;
 
         |Usuario|
-        if (¿Ver detalle?) then (sí)
+        if (¿Ver detalle?) then (si)
             :Navegar a detalle del evento;
         else (no)
             :Continuar explorando mapa;
         endif
     endif
 
-    if (¿Obtener direcciones?) then (sí)
+    if (¿Obtener direcciones?) then (si)
         |Sistema|
-        :Abrir aplicación de mapas externa;
+        :Abrir aplicacion de mapas externa;
         :Establecer destino con coordenadas;
     endif
 }
@@ -99,18 +99,18 @@ partition "Visualización en Mapa" #LightGreen {
 end fork
 
 |Usuario|
-:Seleccionar evento de interés;
+:Seleccionar evento de interes;
 
 |Sistema|
 :Cargar detalle completo del evento;
 note right
-  Información mostrada:
-  * Título y descripción
-  * Fecha, hora y duración
-  * Ubicación con mini mapa
+  Informacion mostrada:
+  * Titulo y descripcion
+  * Fecha, hora y duracion
+  * Ubicacion con mini mapa
   * Organizador
-  * Categoría
-  * Estadísticas (asistentes, valoración)
+  * Categoria
+  * Estadisticas (asistentes, valoracion)
   * Estado de favorito
   * Acciones disponibles
 end note
@@ -118,7 +118,7 @@ end note
 |Usuario|
 :Visualizar detalle del evento;
 
-if (¿Tomar acción?) then (sí)
+if (¿Tomar accion?) then (si)
     fork
         :Inscribirse;
     fork again
@@ -131,7 +131,7 @@ if (¿Tomar acción?) then (sí)
         :Obtener indicaciones;
     end fork
 else (no)
-    :Volver a exploración;
+    :Volver a exploracion;
 endif
 
 stop
