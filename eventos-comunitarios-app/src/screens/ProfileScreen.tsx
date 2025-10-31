@@ -2,10 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius } from '../theme';
+import { ProfileStackParamList } from '../navigation/TabNavigator';
 
-export const ProfileScreen: React.FC = () => {
+type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
+
+interface Props {
+    navigation: ProfileScreenNavigationProp;
+}
+
+export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     const { user, signOut } = useAuth();
 
     const handleLogout = () => {
@@ -54,20 +62,17 @@ export const ProfileScreen: React.FC = () => {
                     <Text style={styles.email}>{user?.email}</Text>
                 </View>
 
-                {/* Menu Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Cuenta</Text>
                     <MenuItem
                         icon="person-outline"
                         title="Editar perfil"
-                        onPress={() => { }}
-                        developing
+                        onPress={() => navigation.navigate('EditProfile')}
                     />
                     <MenuItem
                         icon="key-outline"
                         title="Cambiar contraseña"
-                        onPress={() => { }}
-                        developing
+                        onPress={() => navigation.navigate('ChangePassword')}
                     />
                     <MenuItem
                         icon="heart-outline"

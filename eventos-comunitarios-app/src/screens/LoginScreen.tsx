@@ -11,12 +11,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { colors, spacing, typography } from '../theme';
 
+type LoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
+
 export const LoginScreen: React.FC = () => {
+    const navigation = useNavigation<LoginNavigationProp>();
     const { signIn } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -122,7 +128,7 @@ export const LoginScreen: React.FC = () => {
 
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>¿No tienes cuenta? </Text>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
                             <Text style={styles.registerLink}>Regístrate</Text>
                         </TouchableOpacity>
                     </View>

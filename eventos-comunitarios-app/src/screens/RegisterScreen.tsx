@@ -9,13 +9,20 @@ import {
     Alert,
     TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { colors, spacing, typography } from '../theme';
 
+type RegisterNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
+
 export const RegisterScreen: React.FC = () => {
+    const navigation = useNavigation<RegisterNavigationProp>();
     const { signUp } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
@@ -84,94 +91,100 @@ export const RegisterScreen: React.FC = () => {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
+        <SafeAreaView style={styles.safeArea}>
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <View style={styles.header}>
-                    <View style={styles.logoContainer}>
-                        <Ionicons name="calendar" size={48} color={colors.primary} />
-                        <Text style={styles.logoText}>Azuevento</Text>
-                    </View>
-                    <Text style={styles.title}>Crear Cuenta</Text>
-                    <Text style={styles.subtitle}>
-                        Únete a la comunidad y descubre eventos increíbles
-                    </Text>
-                </View>
-
-                <View style={styles.form}>
-                    <Input
-                        label="Nombre completo"
-                        placeholder="Juan Pérez"
-                        value={formData.name}
-                        onChangeText={(text) => updateField('name', text)}
-                        error={errors.name}
-                        autoCapitalize="words"
-                        autoCorrect={false}
-                    />
-
-                    <Input
-                        label="Email"
-                        placeholder="juan@email.com"
-                        value={formData.email}
-                        onChangeText={(text) => updateField('email', text)}
-                        error={errors.email}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                    />
-
-                    <Input
-                        label="Contraseña"
-                        placeholder="Mínimo 6 caracteres"
-                        value={formData.password}
-                        onChangeText={(text) => updateField('password', text)}
-                        error={errors.password}
-                        secureTextEntry
-                        autoCapitalize="none"
-                    />
-
-                    <Input
-                        label="Confirmar contraseña"
-                        placeholder="Repite tu contraseña"
-                        value={formData.confirmPassword}
-                        onChangeText={(text) => updateField('confirmPassword', text)}
-                        error={errors.confirmPassword}
-                        secureTextEntry
-                        autoCapitalize="none"
-                    />
-
-                    <Button
-                        title="Crear Cuenta"
-                        onPress={handleRegister}
-                        loading={loading}
-                        fullWidth
-                    />
-
-                    <View style={styles.termsContainer}>
-                        <Text style={styles.termsText}>
-                            Al registrarte, aceptas nuestros{' '}
-                            <Text style={styles.termsLink}>Términos y condiciones</Text>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.header}>
+                        <View style={styles.logoContainer}>
+                            <Ionicons name="calendar" size={48} color={colors.primary} />
+                            <Text style={styles.logoText}>Azuevento</Text>
+                        </View>
+                        <Text style={styles.title}>Crear Cuenta</Text>
+                        <Text style={styles.subtitle}>
+                            Únete a la comunidad y descubre eventos increíbles
                         </Text>
                     </View>
-                </View>
 
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>¿Ya tienes cuenta? </Text>
-                    <TouchableOpacity>
-                        <Text style={styles.loginLink}>Inicia sesión</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                    <View style={styles.form}>
+                        <Input
+                            label="Nombre completo"
+                            placeholder="Juan Pérez"
+                            value={formData.name}
+                            onChangeText={(text) => updateField('name', text)}
+                            error={errors.name}
+                            autoCapitalize="words"
+                            autoCorrect={false}
+                        />
+
+                        <Input
+                            label="Email"
+                            placeholder="juan@email.com"
+                            value={formData.email}
+                            onChangeText={(text) => updateField('email', text)}
+                            error={errors.email}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+
+                        <Input
+                            label="Contraseña"
+                            placeholder="Mínimo 6 caracteres"
+                            value={formData.password}
+                            onChangeText={(text) => updateField('password', text)}
+                            error={errors.password}
+                            secureTextEntry
+                            autoCapitalize="none"
+                        />
+
+                        <Input
+                            label="Confirmar contraseña"
+                            placeholder="Repite tu contraseña"
+                            value={formData.confirmPassword}
+                            onChangeText={(text) => updateField('confirmPassword', text)}
+                            error={errors.confirmPassword}
+                            secureTextEntry
+                            autoCapitalize="none"
+                        />
+
+                        <Button
+                            title="Crear Cuenta"
+                            onPress={handleRegister}
+                            loading={loading}
+                            fullWidth
+                        />
+
+                        <View style={styles.termsContainer}>
+                            <Text style={styles.termsText}>
+                                Al registrarte, aceptas nuestros{' '}
+                                <Text style={styles.termsLink}>Términos y condiciones</Text>
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.footer}>
+                        <Text style={styles.footerText}>¿Ya tienes cuenta? </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                            <Text style={styles.loginLink}>Inicia sesión</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
     container: {
         flex: 1,
         backgroundColor: colors.background,

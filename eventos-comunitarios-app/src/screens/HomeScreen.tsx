@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,120 +8,237 @@ import {
     ActivityIndicator,
     Alert,
     TouchableOpacity,
-    AppState,
+    TextInput,
+    ScrollView,
+    Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ExploreStackParamList } from '../navigation/TabNavigator';
 import { eventService } from '../services/eventService';
+import { categoryService } from '../services/categoryService';
 import { EventCard } from '../components/EventCard';
-import type { Event } from '../types/models';
+import type { Event, Category } from '../types/models';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
+import { getCategoryIcon } from '../utils/formatters';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<ExploreStackParamList, 'ExploreHome'>;
 
 export const HomeScreen: React.FC = () => {
-    const { user } = useAuth();
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const insets = useSafeAreaInsets();
+
+    // State
     const [events, setEvents] = useState<Event[]>([]);
+    const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     useEffect(() => {
-        loadEvents();
+        loadData();
     }, []);
 
-    const loadEvents = async () => {
+    useEffect(() => {
+        filterEvents();
+    }, [searchQuery, selectedCategory, events]);
+
+    const loadData = async () => {
         try {
-            const data = await eventService.getAll();
-            setEvents(data);
+            const [eventsData, categoriesData] = await Promise.all([
+                eventService.getAll(),
+                categoryService.getAll(),
+            ]);
+            setEvents(eventsData);
+            setFilteredEvents(eventsData);
+            setCategories(categoriesData);
         } catch (error: any) {
-            console.error('Error loading events:', error);
-            Alert.alert(
-                'Error',
-                error.message || 'No se pudieron cargar los eventos'
-            );
+            console.error('Error loading data:', error);
+            Alert.alert('Error', error.message || 'No se pudieron cargar los datos');
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     };
 
+    const filterEvents = useCallback(() => {
+        let result = [...events];
+
+        if (selectedCategory !== null) {
+            result = result.filter(event => event.categoryId === selectedCategory);
+        }
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            result = result.filter(event =>
+                event.title.toLowerCase().includes(query) ||
+                event.description.toLowerCase().includes(query) ||
+                event.location.toLowerCase().includes(query) ||
+                event.categoryName.toLowerCase().includes(query)
+            );
+        }
+
+        setFilteredEvents(result);
+    }, [events, selectedCategory, searchQuery]);
+
     const handleRefresh = () => {
         setRefreshing(true);
-        loadEvents();
+        setSelectedCategory(null);
+        setSearchQuery('');
+        loadData();
     };
 
     const handleEventPress = (event: Event) => {
         navigation.navigate('EventDetail', { eventId: event.id });
     };
 
-    const renderHeader = () => (
-        <View style={[styles.header, { paddingTop: spacing.lg + insets.top }]}>
-            <View style={styles.headerTop}>
-                <View>
-                    <Text style={styles.greeting}>Hola, {user?.name?.split(' ')[0]}!</Text>
-                    <Text style={styles.subtitle}>
-                        Descubre eventos increíbles
-                    </Text>
-                </View>
-            </View>
+    const handleCategoryPress = (categoryId: number | null) => {
+        setSelectedCategory(selectedCategory === categoryId ? null : categoryId);
+    };
 
-            {events.length > 0 && (
-                <View style={styles.statsContainer}>
-                    <View style={styles.statItem}>
-                        <Ionicons name="calendar" size={20} color={colors.primary} />
-                        <Text style={styles.statNumber}>{events.length}</Text>
-                        <Text style={styles.statLabel}>Eventos</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Ionicons name="people" size={20} color={colors.secondary} />
-                        <Text style={styles.statNumber}>
-                            {events.reduce((sum, e) => sum + e.participantCount, 0)}
-                        </Text>
-                        <Text style={styles.statLabel}>Asistentes</Text>
-                    </View>
-                </View>
-            )}
-        </View>
-    );
+    const clearSearch = () => {
+        setSearchQuery('');
+        Keyboard.dismiss();
+    };
 
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={64} color={colors.text.disabled} />
-            <Text style={styles.emptyTitle}>No hay eventos</Text>
-            <Text style={styles.emptyText}>
-                Aún no se han publicado eventos. ¡Sé el primero en crear uno!
+            <Ionicons
+                name={searchQuery || selectedCategory ? "search-outline" : "calendar-outline"}
+                size={56}
+                color={colors.text.disabled}
+            />
+            <Text style={styles.emptyTitle}>
+                {searchQuery || selectedCategory ? 'Sin resultados' : 'No hay eventos'}
             </Text>
+            <Text style={styles.emptyText}>
+                {searchQuery || selectedCategory
+                    ? 'Intenta con otra búsqueda'
+                    : '¡Sé el primero en crear uno!'}
+            </Text>
+            {(searchQuery || selectedCategory) && (
+                <TouchableOpacity
+                    style={styles.clearFiltersButton}
+                    onPress={() => {
+                        setSearchQuery('');
+                        setSelectedCategory(null);
+                    }}
+                >
+                    <Text style={styles.clearFiltersText}>Limpiar filtros</Text>
+                </TouchableOpacity>
+            )}
         </View>
     );
 
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Cargando eventos...</Text>
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
+            {/* Header */}
+            <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <View style={[styles.searchBar, isSearchFocused && styles.searchBarFocused]}>
+                        <Ionicons
+                            name="search"
+                            size={20}
+                            color={isSearchFocused ? colors.primary : colors.text.secondary}
+                        />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Buscar eventos..."
+                            placeholderTextColor={colors.text.disabled}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setIsSearchFocused(false)}
+                            returnKeyType="search"
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={clearSearch} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
+
+                {/* Category Chips */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoriesContainer}
+                >
+                    {/* All option */}
+                    <TouchableOpacity
+                        style={[
+                            styles.categoryChip,
+                            selectedCategory === null && styles.categoryChipSelected
+                        ]}
+                        onPress={() => handleCategoryPress(null)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons
+                            name="apps"
+                            size={16}
+                            color={selectedCategory === null ? colors.text.inverse : colors.text.secondary}
+                        />
+                        <Text style={[
+                            styles.categoryChipText,
+                            selectedCategory === null && styles.categoryChipTextSelected
+                        ]}>
+                            Todos
+                        </Text>
+                    </TouchableOpacity>
+
+                    {categories.map((category) => (
+                        <TouchableOpacity
+                            key={category.id}
+                            style={[
+                                styles.categoryChip,
+                                selectedCategory === category.id && styles.categoryChipSelected
+                            ]}
+                            onPress={() => handleCategoryPress(category.id)}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name={getCategoryIcon(category.name) as any}
+                                size={16}
+                                color={selectedCategory === category.id ? colors.text.inverse : colors.text.secondary}
+                            />
+                            <Text style={[
+                                styles.categoryChipText,
+                                selectedCategory === category.id && styles.categoryChipTextSelected
+                            ]} numberOfLines={1}>
+                                {category.name}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+
+            {/* Events List */}
             <FlatList
-                data={events}
+                data={filteredEvents}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item }) => (
                     <EventCard event={item} onPress={() => handleEventPress(item)} />
                 )}
-                ListHeaderComponent={renderHeader}
                 ListEmptyComponent={renderEmptyState}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={[
+                    styles.listContent,
+                    filteredEvents.length === 0 && styles.listContentEmpty
+                ]}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -130,24 +247,17 @@ export const HomeScreen: React.FC = () => {
                         colors={[colors.primary]}
                     />
                 }
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             />
 
-            {/* FAB - Create Event Button */}
+            {/* FAB */}
             <TouchableOpacity
                 style={[styles.fab, { bottom: spacing.lg + insets.bottom }]}
                 onPress={() => navigation.navigate('CreateEvent')}
                 activeOpacity={0.8}
             >
-                <Ionicons name="add" size={32} color={colors.text.inverse} />
-            </TouchableOpacity>
-
-            {/* My Events Button */}
-            <TouchableOpacity
-                style={[styles.myEventsButton, { bottom: spacing.lg + insets.bottom }]}
-                onPress={() => navigation.navigate('MyEvents')}
-                activeOpacity={0.8}
-            >
-                <Ionicons name="list" size={24} color={colors.text.inverse} />
+                <Ionicons name="add" size={28} color={colors.text.inverse} />
             </TouchableOpacity>
         </View>
     );
@@ -164,110 +274,117 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: colors.background,
     },
-    loadingText: {
-        marginTop: spacing.md,
-        fontSize: typography.body.fontSize,
-        color: colors.text.secondary,
-    },
-    listContent: {
-        padding: spacing.md,
-    },
+    // Header
     header: {
-        marginBottom: spacing.xl,
-    },
-    headerTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: spacing.lg,
-    },
-    greeting: {
-        fontSize: typography.h2.fontSize,
-        fontWeight: typography.h2.fontWeight,
-        color: colors.text.primary,
-        marginBottom: 4,
-    },
-    subtitle: {
-        fontSize: typography.bodySmall.fontSize,
-        color: colors.text.secondary,
-    },
-    statsContainer: {
-        flexDirection: 'row',
         backgroundColor: colors.surface,
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
-        ...shadows.sm,
+        paddingBottom: spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
     },
-    statItem: {
-        flex: 1,
+    // Search
+    searchContainer: {
+        paddingHorizontal: spacing.md,
+        marginBottom: spacing.sm,
+    },
+    searchBar: {
+        flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: colors.background,
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.sm,
+    },
+    searchBarFocused: {
+        borderColor: colors.primary,
+        backgroundColor: colors.surface,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: typography.body.fontSize,
+        color: colors.text.primary,
+        paddingVertical: 2,
+    },
+    // Categories
+    categoriesContainer: {
+        paddingHorizontal: spacing.md,
         gap: spacing.xs,
     },
-    statDivider: {
-        width: 1,
-        backgroundColor: colors.border,
-        marginHorizontal: spacing.md,
+    categoryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.xs,
     },
-    statNumber: {
-        fontSize: typography.h3.fontSize,
-        fontWeight: typography.h3.fontWeight,
-        color: colors.text.primary,
+    categoryChipSelected: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
-    statLabel: {
-        fontSize: typography.caption.fontSize,
+    categoryChipText: {
+        fontSize: typography.bodySmall.fontSize,
         color: colors.text.secondary,
+        fontWeight: '500',
     },
+    categoryChipTextSelected: {
+        color: colors.text.inverse,
+    },
+    // List
+    listContent: {
+        padding: spacing.md,
+        paddingBottom: 100,
+    },
+    listContentEmpty: {
+        flex: 1,
+    },
+    // Empty state
     emptyState: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: spacing.xxl,
-    },
-    emptyEmoji: {
-        fontSize: 64,
-        marginBottom: spacing.md,
+        paddingHorizontal: spacing.lg,
     },
     emptyTitle: {
-        fontSize: typography.h3.fontSize,
-        fontWeight: typography.h3.fontWeight,
+        fontSize: typography.h4.fontSize,
+        fontWeight: '600',
         color: colors.text.primary,
+        marginTop: spacing.md,
         marginBottom: spacing.xs,
     },
     emptyText: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
         textAlign: 'center',
-        paddingHorizontal: spacing.xl,
     },
+    clearFiltersButton: {
+        marginTop: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.full,
+    },
+    clearFiltersText: {
+        fontSize: typography.bodySmall.fontSize,
+        fontWeight: '600',
+        color: colors.text.inverse,
+    },
+    // FAB
     fab: {
         position: 'absolute',
-        bottom: spacing.lg,
-        right: spacing.lg,
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-    },
-    myEventsButton: {
-        position: 'absolute',
-        bottom: spacing.lg,
-        left: spacing.lg,
+        right: spacing.md,
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: colors.secondary,
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
+        ...shadows.lg,
     },
 });
