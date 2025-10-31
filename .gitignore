@@ -58,3 +58,6 @@ docker-compose.override.yml
 # Database backups
 *.sql.backup
 *.dump
+
+
+plan/diagramas/png

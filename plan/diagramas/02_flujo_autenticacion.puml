@@ -1,0 +1,79 @@
+@startuml Flujo_Autenticacion
+skinparam activityBackgroundColor #FEFECE
+skinparam activityBorderColor #A80036
+skinparam activityDiamondBackgroundColor #FEFECE
+skinparam activityDiamondBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Actividades - Flujo de Autenticación
+
+|Usuario|
+start
+
+:Abrir aplicación;
+
+|Sistema|
+:Leer token y datos de usuario\ndesde almacenamiento local\n(AsyncStorage);
+
+if (¿Existen datos almacenados?) then (sí)
+    :Restaurar sesión localmente;
+
+    |Usuario|
+    :Acceder a pantalla principal;
+    stop
+else (no)
+    |Usuario|
+    :Mostrar pantalla de login;
+endif
+
+if (¿Usuario registrado?) then (sí)
+    :Ingresar credenciales\n(email, contraseña);
+
+    |Sistema|
+    :POST /api/auth/login;
+    :Autenticar con AuthenticationManager;
+
+    if (¿Credenciales válidas?) then (sí)
+        :Generar token JWT;
+        :Retornar AuthResponse\n(token, userId, name, email, role);
+
+        |Usuario|
+        :Almacenar token y datos\nen AsyncStorage;
+        :Acceder a pantalla principal;
+        stop
+    else (no)
+        :Retornar error 401;
+
+        |Usuario|
+        :Mostrar mensaje de error;
+        :Permitir reintento;
+        stop
+    endif
+else (no)
+    :Navegar a registro;
+    :Ingresar datos de registro\n(nombre, email, contraseña);
+
+    |Sistema|
+    :POST /api/auth/register;
+    :Verificar email disponible;
+
+    if (¿Email disponible?) then (sí)
+        :Crear cuenta de usuario;
+        :Encriptar contraseña (BCrypt);
+        :Generar token JWT;
+        :Retornar AuthResponse\n(token, userId, name, email, role);
+
+        |Usuario|
+        :Almacenar token y datos\nen AsyncStorage;
+        :Acceder a pantalla principal;
+        stop
+    else (no)
+        :Retornar error 400;
+
+        |Usuario|
+        :Mostrar mensaje\n"Email ya registrado";
+        stop
+    endif
+endif
+
+@enduml

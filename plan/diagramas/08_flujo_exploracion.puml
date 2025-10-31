@@ -1,0 +1,139 @@
+@startuml Flujo_Exploracion
+skinparam activityBackgroundColor #FEFECE
+skinparam activityBorderColor #A80036
+skinparam activityDiamondBackgroundColor #FEFECE
+skinparam activityDiamondBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Actividades - Exploración y Descubrimiento de Eventos
+
+|Usuario|
+start
+
+:Acceder a pantalla de exploración;
+
+|Sistema|
+:Consultar eventos públicos;
+note right
+  Filtros aplicados:
+  * visibility = PUBLIC
+  * status = PUBLISHED
+  * deleted_at = NULL
+  * Ordenados por fecha (próximos primero)
+end note
+
+:Retornar lista de eventos;
+
+|Usuario|
+:Visualizar listado de eventos;
+
+fork
+
+partition "Búsqueda por Texto" #LightYellow {
+    :Ingresar término de búsqueda;
+
+    |Sistema|
+    :Filtrar por coincidencia en:
+    - Título
+    - Descripción
+    - Ubicación
+    - Categoría;
+
+    :Actualizar resultados;
+
+    |Usuario|
+    :Visualizar resultados filtrados;
+}
+
+fork again
+
+partition "Filtrado por Categoría" #LightBlue {
+    :Seleccionar categoría;
+
+    |Sistema|
+    :Filtrar eventos por category_id;
+    :Actualizar resultados;
+
+    |Usuario|
+    :Visualizar eventos de categoría;
+
+    if (¿Seleccionar otra categoría?) then (sí)
+        :Cambiar filtro de categoría;
+    else (no)
+        :Limpiar filtro (ver todos);
+    endif
+}
+
+fork again
+
+partition "Visualización en Mapa" #LightGreen {
+    :Cambiar a vista de mapa;
+
+    |Sistema|
+    :Obtener eventos con coordenadas;
+    :Generar marcadores geográficos;
+
+    |Usuario|
+    :Visualizar mapa con marcadores;
+    :Navegar por el mapa;
+
+    if (¿Seleccionar marcador?) then (sí)
+        |Sistema|
+        :Mostrar resumen del evento;
+
+        |Usuario|
+        if (¿Ver detalle?) then (sí)
+            :Navegar a detalle del evento;
+        else (no)
+            :Continuar explorando mapa;
+        endif
+    endif
+
+    if (¿Obtener direcciones?) then (sí)
+        |Sistema|
+        :Abrir aplicación de mapas externa;
+        :Establecer destino con coordenadas;
+    endif
+}
+
+end fork
+
+|Usuario|
+:Seleccionar evento de interés;
+
+|Sistema|
+:Cargar detalle completo del evento;
+note right
+  Información mostrada:
+  * Título y descripción
+  * Fecha, hora y duración
+  * Ubicación con mini mapa
+  * Organizador
+  * Categoría
+  * Estadísticas (asistentes, valoración)
+  * Estado de favorito
+  * Acciones disponibles
+end note
+
+|Usuario|
+:Visualizar detalle del evento;
+
+if (¿Tomar acción?) then (sí)
+    fork
+        :Inscribirse;
+    fork again
+        :Marcar favorito;
+    fork again
+        :Comentar;
+    fork again
+        :Compartir;
+    fork again
+        :Obtener indicaciones;
+    end fork
+else (no)
+    :Volver a exploración;
+endif
+
+stop
+
+@enduml

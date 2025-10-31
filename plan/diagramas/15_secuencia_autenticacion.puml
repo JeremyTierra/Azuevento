@@ -1,0 +1,155 @@
+@startuml Secuencia_Autenticacion
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+
+title Diagrama de Secuencia - Autenticación de Usuario
+
+actor "Usuario" as User
+participant "App Móvil\n(React Native)" as App
+participant "AuthContext" as Context
+participant "API REST\n(Spring Boot)" as API
+participant "JwtTokenProvider" as JWT
+database "PostgreSQL" as DB
+
+== Registro de Usuario ==
+
+User -> App: Completar formulario de registro
+activate App
+
+App -> App: Validar campos localmente
+
+App -> API: POST /api/auth/register\n{name, email, password}
+activate API
+
+API -> DB: SELECT * FROM users\nWHERE email = {email}
+activate DB
+DB --> API: null (no existe)
+deactivate DB
+
+API -> API: Encriptar contraseña\n(BCrypt)
+
+API -> DB: INSERT INTO users\n(name, email, password_hash, role, ...)\nVALUES (...)
+activate DB
+DB --> API: User created
+deactivate DB
+
+API -> JWT: generateToken(userId, email)
+activate JWT
+JWT --> API: JWT Token
+deactivate JWT
+
+API --> App: AuthResponse\n{token, user: {id, name, email, role}}
+deactivate API
+
+App -> Context: setAuthState(token, user)
+activate Context
+Context -> Context: Almacenar token en\nAsyncStorage
+Context --> App: Estado actualizado
+deactivate Context
+
+App --> User: Redirigir a pantalla principal
+deactivate App
+
+== Inicio de Sesión ==
+
+User -> App: Ingresar credenciales
+activate App
+
+App -> API: POST /api/auth/login\n{email, password}
+activate API
+
+API -> DB: SELECT * FROM users\nWHERE email = {email}
+activate DB
+DB --> API: User data
+deactivate DB
+
+alt Usuario no encontrado
+    API --> App: 401 Unauthorized\n"Credenciales inválidas"
+end
+
+API -> API: Verificar contraseña\n(BCrypt.matches)
+
+alt Contraseña incorrecta
+    API --> App: 401 Unauthorized\n"Credenciales inválidas"
+end
+
+API -> JWT: generateToken(userId, email)
+activate JWT
+JWT --> API: JWT Token
+deactivate JWT
+
+API --> App: AuthResponse\n{token, user: {...}}
+deactivate API
+
+App -> Context: setAuthState(token, user)
+activate Context
+Context --> App: Estado actualizado
+deactivate Context
+
+App --> User: Redirigir a pantalla principal
+deactivate App
+
+== Verificación de Token (al abrir app) ==
+
+User -> App: Abrir aplicación
+activate App
+
+App -> Context: checkAuthState()
+activate Context
+
+Context -> Context: Leer token de AsyncStorage
+
+alt No hay token
+    Context --> App: No autenticado
+    App --> User: Mostrar pantalla de login
+end
+
+Context -> API: GET /api/auth/me\nAuthorization: Bearer {token}
+activate API
+
+API -> JWT: validateToken(token)
+activate JWT
+
+alt Token expirado o inválido
+    JWT --> API: Invalid
+    API --> Context: 401 Unauthorized
+    Context -> Context: Limpiar token almacenado
+    Context --> App: No autenticado
+    App --> User: Mostrar pantalla de login
+end
+
+JWT --> API: Valid + userId
+deactivate JWT
+
+API -> DB: SELECT * FROM users\nWHERE id = {userId}
+activate DB
+DB --> API: User data
+deactivate DB
+
+API --> Context: UserResponse\n{id, name, email, role}
+deactivate API
+
+Context --> App: Autenticado
+deactivate Context
+
+App --> User: Mostrar pantalla principal
+deactivate App
+
+== Cierre de Sesión ==
+
+User -> App: Pulsar "Cerrar sesión"
+activate App
+
+App -> Context: logout()
+activate Context
+
+Context -> Context: Eliminar token de AsyncStorage
+Context -> Context: Limpiar estado de usuario
+Context --> App: Sesión cerrada
+deactivate Context
+
+App --> User: Redirigir a login
+deactivate App
+
+@enduml

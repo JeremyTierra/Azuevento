@@ -1,0 +1,112 @@
+@startuml Navegacion_App
+skinparam stateBackgroundColor #FEFECE
+skinparam stateBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Navegación - Estructura de la Aplicación Móvil
+
+state "Aplicación" as App {
+
+    state "Stack de Autenticación" as AuthStack {
+        state "Pantalla de Login" as Login
+        state "Pantalla de Registro" as Register
+
+        [*] --> Login
+        Login --> Register : Crear cuenta
+        Register --> Login : Ya tengo cuenta
+        Login --> [*] : Login exitoso
+        Register --> [*] : Registro exitoso
+    }
+
+    state "Tab Navigator" as TabNav {
+
+        state "Tab: Explorar" as ExploreTab {
+            state "Lista de Eventos" as ExploreHome
+            state "Detalle de Evento" as EventDetail1
+            state "Crear Evento" as CreateEvent1
+            state "Comentarios" as Comments1
+            state "Mi Entrada (QR)" as MyTicket1
+            state "Escáner QR" as Scanner1
+
+            [*] --> ExploreHome
+            ExploreHome --> EventDetail1 : Ver evento
+            ExploreHome --> CreateEvent1 : FAB (+)
+            EventDetail1 --> Comments1 : Ver comentarios
+            EventDetail1 --> MyTicket1 : Mi entrada
+            EventDetail1 --> Scanner1 : Escanear (organizador)
+        }
+
+        state "Tab: Mi Agenda" as MyEventsTab {
+            state "Mis Eventos\n(Favoritos/Creados/Asistiendo)" as MyEventsList
+            state "Detalle de Evento" as EventDetail2
+            state "Crear Evento" as CreateEvent2
+            state "Comentarios" as Comments2
+            state "Mi Entrada (QR)" as MyTicket2
+            state "Escáner QR" as Scanner2
+
+            [*] --> MyEventsList
+            MyEventsList --> EventDetail2 : Ver evento
+            MyEventsList --> CreateEvent2 : FAB (+)
+            EventDetail2 --> Comments2 : Ver comentarios
+            EventDetail2 --> MyTicket2 : Mi entrada
+            EventDetail2 --> Scanner2 : Escanear
+        }
+
+        state "Tab: Mapa" as MapTab {
+            state "Vista de Mapa" as MapMain
+            state "Detalle de Evento" as EventDetail3
+            state "Comentarios" as Comments3
+
+            [*] --> MapMain
+            MapMain --> EventDetail3 : Seleccionar marcador
+            EventDetail3 --> Comments3 : Ver comentarios
+        }
+
+        state "Tab: Perfil" as ProfileTab {
+            state "Mi Perfil" as ProfileMain
+            state "Editar Perfil" as EditProfile
+            state "Cambiar Contraseña" as ChangePassword
+
+            [*] --> ProfileMain
+            ProfileMain --> EditProfile : Editar
+            ProfileMain --> ChangePassword : Cambiar contraseña
+            EditProfile --> ProfileMain : Guardar/Cancelar
+            ChangePassword --> ProfileMain : Guardar/Cancelar
+        }
+    }
+
+    [*] --> AuthStack : Usuario no autenticado
+    AuthStack --> TabNav : Autenticación exitosa
+    TabNav --> AuthStack : Cerrar sesión
+}
+
+note right of TabNav
+  **Navegación por Tabs:**
+  4 tabs principales en la parte
+  inferior de la pantalla.
+
+  Cada tab tiene su propio
+  stack de navegación.
+end note
+
+note bottom of ExploreTab
+  **Pantalla principal:**
+  Lista de eventos públicos
+  con búsqueda y filtros
+end note
+
+note bottom of MyEventsTab
+  **Subtabs internos:**
+  * Favoritos
+  * Creados por mí
+  * Eventos a los que asisto
+end note
+
+note bottom of MapTab
+  **Funcionalidades:**
+  * Marcadores de eventos
+  * Integración con mapas externos
+  * Vista de resumen al seleccionar
+end note
+
+@enduml

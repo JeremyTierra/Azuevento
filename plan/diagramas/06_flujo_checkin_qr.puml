@@ -1,0 +1,92 @@
+@startuml Flujo_CheckIn_QR
+skinparam activityBackgroundColor #FEFECE
+skinparam activityBorderColor #A80036
+skinparam activityDiamondBackgroundColor #FEFECE
+skinparam activityDiamondBorderColor #A80036
+skinparam arrowColor #A80036
+skinparam swimlaneWidth 200
+
+title Diagrama de Actividades - Sistema de Check-in con Código QR
+
+|Participante|
+start
+
+partition "Generación de Entrada" {
+    :Acceder a evento inscrito;
+    :Seleccionar "Mi Entrada";
+
+    |Sistema|
+    :GET /api/events/{eventId}/my-ticket;
+    :Verificar registro de participante;
+    :Obtener checkin_token del registro;
+    note right
+      El token se genera al inscribirse
+      con SecureRandom + Base64
+      (64 caracteres, único)
+    end note
+
+    |Participante|
+    :Visualizar pantalla de entrada;
+    note right
+      La entrada muestra:
+      * Título del evento
+      * Fecha y hora
+      * Ubicación
+      * Nombre del participante
+      * Código QR con checkin_token
+    end note
+}
+
+|#LightBlue|Organizador|
+
+partition "Proceso de Check-in" {
+    :Acceder a evento propio;
+    :Seleccionar "Escanear QR";
+
+    |Sistema|
+    :Activar cámara del dispositivo;
+
+    |Organizador|
+    :Apuntar cámara al código QR;
+
+    |Participante|
+    :Presentar código QR de entrada;
+
+    |Sistema|
+    :Decodificar código QR;
+    :Extraer checkin_token;
+    :POST /api/events/{eventId}/checkin;
+    :Verificar que el usuario es organizador;
+    :Buscar participante por\nevent_id + checkin_token;
+
+    if (¿Participante encontrado?) then (sí)
+        :Verificar estado de check-in;
+
+        if (¿Ya hizo check-in?) then (sí)
+            |Organizador|
+            #Orange:Mostrar alerta\n"Ya registrado anteriormente";
+            :Mostrar hora de check-in previo;
+        else (no)
+            |Sistema|
+            :Actualizar attendance_status = ATTENDED;
+            :Registrar checked_in_at = NOW();
+
+            |Organizador|
+            #LightGreen:Mostrar confirmación exitosa;
+            :Mostrar nombre del participante;
+        endif
+    else (no)
+        |Organizador|
+        #Red:Mostrar error\n"Código QR inválido o\nno pertenece a este evento";
+    endif
+
+    if (¿Más participantes?) then (sí)
+        :Volver a escanear;
+    else (no)
+        :Finalizar proceso;
+    endif
+}
+
+stop
+
+@enduml

@@ -1,0 +1,146 @@
+@startuml Flujo_Gestion_Perfil
+skinparam activityBackgroundColor #FEFECE
+skinparam activityBorderColor #A80036
+skinparam activityDiamondBackgroundColor #FEFECE
+skinparam activityDiamondBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Actividades - Gestión de Perfil de Usuario
+
+|Usuario|
+start
+
+:Acceder a sección "Perfil";
+
+|Sistema|
+:Cargar datos del usuario actual;
+:Mostrar información del perfil;
+
+|Usuario|
+:Visualizar perfil;
+note right
+  Información mostrada:
+  * Nombre
+  * Email
+  * Descripción
+  * Intereses (categorías)
+  * Foto de perfil
+end note
+
+fork
+
+partition "Editar Perfil" #LightYellow {
+    :Seleccionar "Editar perfil";
+
+    |Sistema|
+    :Cargar formulario con datos actuales;
+
+    |Usuario|
+    :Modificar campos deseados;
+    note right
+      Campos editables:
+      * Nombre
+      * Teléfono
+      * Descripción
+      * Foto de perfil
+    end note
+
+    :Guardar cambios;
+
+    |Sistema|
+    :Validar datos de entrada;
+
+    if (¿Datos válidos?) then (sí)
+        :Actualizar registro en base de datos;
+        :Retornar perfil actualizado;
+
+        |Usuario|
+        :Mostrar confirmación de éxito;
+        :Actualizar vista del perfil;
+    else (no)
+        |Usuario|
+        :Mostrar errores de validación;
+        :Corregir datos;
+    endif
+}
+
+fork again
+
+partition "Gestionar Intereses" #LightBlue {
+    :Acceder a selección de intereses;
+
+    |Sistema|
+    :Cargar lista de categorías;
+    :Marcar categorías ya seleccionadas;
+
+    |Usuario|
+    :Seleccionar/deseleccionar categorías;
+    :Confirmar selección;
+
+    |Sistema|
+    :Actualizar tabla user_interests;
+    :Sincronizar intereses del usuario;
+
+    |Usuario|
+    :Mostrar intereses actualizados;
+}
+
+fork again
+
+partition "Cambiar Contraseña" #LightGreen {
+    :Seleccionar "Cambiar contraseña";
+
+    |Sistema|
+    :Mostrar formulario de cambio;
+
+    |Usuario|
+    :Ingresar contraseña actual;
+    :Ingresar nueva contraseña;
+    :Confirmar nueva contraseña;
+    :Enviar solicitud;
+
+    |Sistema|
+    :Verificar contraseña actual;
+
+    if (¿Contraseña actual correcta?) then (sí)
+        :Validar nueva contraseña;
+
+        if (¿Nueva contraseña válida?) then (sí)
+            if (¿Coinciden las contraseñas?) then (sí)
+                :Encriptar nueva contraseña (BCrypt);
+                :Actualizar password_hash;
+
+                |Usuario|
+                :Mostrar confirmación de éxito;
+            else (no)
+                |Usuario|
+                :Mostrar error\n"Las contraseñas no coinciden";
+            endif
+        else (no)
+            |Usuario|
+            :Mostrar requisitos de contraseña;
+        endif
+    else (no)
+        |Usuario|
+        :Mostrar error\n"Contraseña actual incorrecta";
+    endif
+}
+
+fork again
+
+partition "Cerrar Sesión" #LightPink {
+    :Seleccionar "Cerrar sesión";
+
+    |Sistema|
+    :Eliminar token JWT almacenado;
+    :Limpiar estado de autenticación;
+
+    |Usuario|
+    :Redirigir a pantalla de login;
+}
+
+end fork
+
+stop
+
+@enduml
