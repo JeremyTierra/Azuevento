@@ -41,6 +41,14 @@ export const eventService = {
     },
 
     /**
+     * Get events the user is attending (registered as participant)
+     */
+    async getAttendingEvents(): Promise<Event[]> {
+        const response = await api.get<Event[]>(ENDPOINTS.ATTENDING_EVENTS);
+        return response.data;
+    },
+
+    /**
      * Create a new event
      */
     async create(data: EventRequest): Promise<Event> {

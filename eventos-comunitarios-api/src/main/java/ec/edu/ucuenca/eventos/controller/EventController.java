@@ -111,7 +111,14 @@ public class EventController {
         List<EventResponse> events = eventService.getMyEvents(userId);
         return ResponseEntity.ok(events);
     }
-    
+
+    @GetMapping("/attending")
+    public ResponseEntity<List<EventResponse>> getAttendingEvents(HttpServletRequest httpRequest) {
+        Long userId = getUserIdFromRequest(httpRequest);
+        List<EventResponse> events = eventService.getAttendingEvents(userId);
+        return ResponseEntity.ok(events);
+    }
+
     @GetMapping("/search")
     public ResponseEntity<List<EventResponse>> searchEvents(
             @RequestParam(required = false) String q,
