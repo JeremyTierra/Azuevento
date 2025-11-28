@@ -1,9 +1,9 @@
 services:
   - type: web
     name: azuevento-api
-    env: java
-    buildCommand: ./gradlew clean build -x test
-    startCommand: java -Dserver.port=$PORT -jar build/libs/*.jar
+    env: docker
+    dockerfilePath: ./eventos-comunitarios-api/Dockerfile
+    dockerContext: ./eventos-comunitarios-api
     envVars:
       - key: SPRING_DATASOURCE_URL
         fromDatabase:
