@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
@@ -16,9 +16,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Callout, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MapStackParamList } from '../navigation/TabNavigator';
+
+type MapScreenRouteProp = RouteProp<MapStackParamList, 'MapMain'>;
 import * as Location from 'expo-location';
 import { eventService } from '../services/eventService';
 import {
@@ -45,11 +47,16 @@ type MapScreenNavigationProp = NativeStackNavigationProp<MapStackParamList, 'Map
 
 export const MapScreen: React.FC = () => {
     const navigation = useNavigation<MapScreenNavigationProp>();
+    const route = useRoute<MapScreenRouteProp>();
     const insets = useSafeAreaInsets();
     const mapRef = useRef<MapView>(null);
 
+    // Get focusEventId from navigation params
+    const focusEventId = route.params?.focusEventId;
+
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
+    const [lastFocusedEventId, setLastFocusedEventId] = useState<number | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [userLocation, setUserLocation] = useState<Coordinate | null>(null);
     const [showDirections, setShowDirections] = useState(false);
@@ -74,10 +81,45 @@ export const MapScreen: React.FC = () => {
         );
     }, [events, searchQuery]);
 
+    // Reload events when screen gains focus (e.g., after creating an event)
+    useFocusEffect(
+        useCallback(() => {
+            loadEvents();
+        }, [])
+    );
+
     useEffect(() => {
-        loadEvents();
         requestLocationPermission();
     }, []);
+
+    // Handle focus on specific event when navigating from EventDetail
+    useEffect(() => {
+        // Only process if we have a new focusEventId that differs from the last one
+        if (focusEventId && events.length > 0 && focusEventId !== lastFocusedEventId) {
+            const eventToFocus = events.find(e => e.id === focusEventId);
+            if (eventToFocus) {
+                setSelectedEvent(eventToFocus);
+                setLastFocusedEventId(focusEventId);
+
+                // Center map on the event
+                if (mapRef.current && eventToFocus.latitude && eventToFocus.longitude) {
+                    setTimeout(() => {
+                        mapRef.current?.animateToRegion({
+                            latitude: eventToFocus.latitude!,
+                            longitude: eventToFocus.longitude!,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                        }, 500);
+
+                        // Automatically start directions after centering
+                        setTimeout(() => {
+                            handleGetDirections(eventToFocus);
+                        }, 600);
+                    }, 300);
+                }
+            }
+        }
+    }, [focusEventId, events, lastFocusedEventId]);
 
     const requestLocationPermission = async () => {
         try {
@@ -377,10 +419,14 @@ export const MapScreen: React.FC = () => {
                             ]}>
                                 <Ionicons
                                     name={getCategoryIcon(event.categoryName) as any}
-                                    size={18}
+                                    size={selectedEvent?.id === event.id ? 20 : 16}
                                     color={colors.text.inverse}
                                 />
                             </View>
+                            <View style={[
+                                styles.markerTail,
+                                selectedEvent?.id === event.id && styles.markerTailSelected
+                            ]} />
                         </View>
                     </Marker>
                 ))}
@@ -397,13 +443,15 @@ export const MapScreen: React.FC = () => {
             </MapView>
 
             {/* Search Bar */}
-            <View style={[styles.searchContainer, { top: insets.top + spacing.sm }]}>
+            <View style={[styles.searchContainer, { top: insets.top + spacing.md }]}>
                 <View style={[styles.searchBar, isSearchFocused && styles.searchBarFocused]}>
-                    <Ionicons
-                        name="search"
-                        size={20}
-                        color={isSearchFocused ? colors.primary : colors.text.secondary}
-                    />
+                    <View style={styles.searchIconContainer}>
+                        <Ionicons
+                            name="search"
+                            size={18}
+                            color={isSearchFocused ? colors.text.inverse : colors.primary}
+                        />
+                    </View>
                     <TextInput
                         style={styles.searchInput}
                         placeholder="Buscar eventos en el mapa..."
@@ -417,10 +465,14 @@ export const MapScreen: React.FC = () => {
                         onBlur={() => setIsSearchFocused(false)}
                         returnKeyType="search"
                     />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={clearSearch}>
+                    {searchQuery.length > 0 ? (
+                        <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
                             <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
                         </TouchableOpacity>
+                    ) : (
+                        <View style={styles.eventCountBadge}>
+                            <Text style={styles.eventCountText}>{filteredEvents.length}</Text>
+                        </View>
                     )}
                 </View>
 
@@ -507,13 +559,13 @@ export const MapScreen: React.FC = () => {
 
             {/* Map Controls */}
             {!showDirections && (
-                <View style={[styles.mapControls, { top: insets.top + 80 }]}>
+                <View style={[styles.mapControls, { top: insets.top + 90 }]}>
                     <TouchableOpacity
                         style={styles.mapButton}
                         onPress={centerOnUser}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="locate" size={22} color={colors.primary} />
+                        <Ionicons name="navigate" size={20} color={colors.primary} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -521,7 +573,7 @@ export const MapScreen: React.FC = () => {
                         onPress={centerOnEvents}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="apps" size={22} color={colors.primary} />
+                        <Ionicons name="scan" size={20} color={colors.primary} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -529,7 +581,7 @@ export const MapScreen: React.FC = () => {
                         onPress={loadEvents}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="refresh" size={22} color={colors.primary} />
+                        <Ionicons name="refresh-outline" size={20} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
             )}
@@ -749,28 +801,63 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
         gap: spacing.sm,
-        ...shadows.md,
+        borderWidth: 1.5,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
     },
     searchBarFocused: {
-        borderWidth: 2,
         borderColor: colors.primary,
+        backgroundColor: colors.surface,
+    },
+    searchIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     searchInput: {
         flex: 1,
         fontSize: typography.body.fontSize,
         color: colors.text.primary,
-        paddingVertical: 2,
+        paddingVertical: spacing.xs,
+    },
+    clearButton: {
+        padding: spacing.xs,
+    },
+    eventCountBadge: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+        marginRight: spacing.xs,
+    },
+    eventCountText: {
+        fontSize: typography.caption.fontSize,
+        fontWeight: '700',
+        color: colors.text.inverse,
     },
     // Search Results Dropdown
     searchResultsDropdown: {
         backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        marginTop: spacing.xs,
-        ...shadows.md,
+        borderRadius: borderRadius.xl,
+        marginTop: spacing.sm,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
         overflow: 'hidden',
     },
     searchResultsHeader: {
@@ -860,43 +947,78 @@ const styles = StyleSheet.create({
     mapButton: {
         width: 44,
         height: 44,
-        borderRadius: 22,
+        borderRadius: 12,
         backgroundColor: colors.surface,
         justifyContent: 'center',
         alignItems: 'center',
-        ...shadows.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     closeButton: {
         position: 'absolute',
         right: spacing.md,
         width: 44,
         height: 44,
-        borderRadius: 22,
+        borderRadius: 12,
         backgroundColor: colors.surface,
         justifyContent: 'center',
         alignItems: 'center',
-        ...shadows.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     // Markers
     markerContainer: {
         alignItems: 'center',
     },
     marker: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 3,
         borderColor: colors.surface,
-        ...shadows.md,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        elevation: 8,
     },
     markerSelected: {
         backgroundColor: colors.success,
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        borderWidth: 4,
+        shadowColor: colors.success,
+    },
+    markerTail: {
+        width: 0,
+        height: 0,
+        borderLeftWidth: 8,
+        borderRightWidth: 8,
+        borderTopWidth: 10,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: colors.primary,
+        marginTop: -4,
+    },
+    markerTailSelected: {
+        borderTopColor: colors.success,
+        borderLeftWidth: 10,
+        borderRightWidth: 10,
+        borderTopWidth: 12,
     },
     // Empty State
     emptyState: {
@@ -919,10 +1041,14 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: colors.surface,
-        borderTopLeftRadius: borderRadius.xl,
-        borderTopRightRadius: borderRadius.xl,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         padding: spacing.lg,
-        ...shadows.lg,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 12,
     },
     // Transport
     transportScroll: {
@@ -937,17 +1063,20 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        paddingVertical: spacing.sm + 2,
         borderRadius: borderRadius.full,
         backgroundColor: colors.background,
+        borderWidth: 1.5,
+        borderColor: colors.border,
         gap: spacing.xs,
     },
     transportChipActive: {
         backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
     transportChipText: {
         fontSize: typography.bodySmall.fontSize,
-        fontWeight: '500',
+        fontWeight: '600',
         color: colors.text.secondary,
     },
     transportChipTextActive: {
@@ -958,28 +1087,33 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.primaryLight,
-        borderRadius: borderRadius.md,
+        backgroundColor: colors.primary + '10',
+        borderRadius: borderRadius.lg,
         padding: spacing.md,
         marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.primary + '20',
     },
     routeInfoItem: {
         flex: 1,
         alignItems: 'center',
     },
     routeInfoValue: {
-        fontSize: typography.h4.fontSize,
+        fontSize: 22,
         fontWeight: '700',
-        color: colors.text.primary,
+        color: colors.primary,
     },
     routeInfoLabel: {
         fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
+        marginTop: 2,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     routeInfoDivider: {
         width: 1,
-        height: 30,
-        backgroundColor: colors.border,
+        height: 36,
+        backgroundColor: colors.primary + '30',
     },
     loadingRoute: {
         flexDirection: 'row',
@@ -1040,15 +1174,15 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     eventImage: {
-        width: 80,
-        height: 80,
-        borderRadius: borderRadius.md,
+        width: 90,
+        height: 90,
+        borderRadius: borderRadius.lg,
         backgroundColor: colors.background,
     },
     eventImagePlaceholder: {
-        width: 80,
-        height: 80,
-        borderRadius: borderRadius.md,
+        width: 90,
+        height: 90,
+        borderRadius: borderRadius.lg,
         backgroundColor: colors.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
@@ -1091,21 +1225,26 @@ const styles = StyleSheet.create({
     actions: {
         flexDirection: 'row',
         gap: spacing.sm,
-        marginTop: spacing.md,
+        marginTop: spacing.lg,
     },
     primaryButton: {
-        flex: 1,
+        flex: 1.2,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: colors.primary,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.md,
-        gap: spacing.xs,
+        paddingVertical: spacing.md + 2,
+        borderRadius: borderRadius.lg,
+        gap: spacing.sm,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     primaryButtonText: {
         fontSize: typography.body.fontSize,
-        fontWeight: '600',
+        fontWeight: '700',
         color: colors.text.inverse,
     },
     secondaryButton: {
@@ -1113,9 +1252,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.primaryLight,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.md,
+        backgroundColor: colors.surface,
+        paddingVertical: spacing.md + 2,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1.5,
+        borderColor: colors.primary,
         gap: spacing.xs,
     },
     secondaryButtonText: {
