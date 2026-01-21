@@ -49,7 +49,11 @@ export const formatDateTime = (dateString: string): string => {
  * @param categoryName Category name
  * @returns Ionicons icon name
  */
-export const getCategoryIcon = (categoryName: string): string => {
+export const getCategoryIcon = (categoryName: string | undefined | null): string => {
+    if (!categoryName) {
+        return 'calendar-outline';
+    }
+    
     const icons: Record<string, string> = {
         // Deportes y actividades físicas
         'Deportes': 'football-outline',
@@ -124,11 +128,15 @@ export const getCategoryIcon = (categoryName: string): string => {
     }
 
     // Buscar coincidencia parcial (case insensitive)
-    const lowerName = categoryName.toLowerCase();
-    for (const [key, value] of Object.entries(icons)) {
-        if (key.toLowerCase().includes(lowerName) || lowerName.includes(key.toLowerCase())) {
-            return value;
+    try {
+        const lowerName = categoryName.toLowerCase();
+        for (const [key, value] of Object.entries(icons)) {
+            if (key.toLowerCase().includes(lowerName) || lowerName.includes(key.toLowerCase())) {
+                return value;
+            }
         }
+    } catch (error) {
+        console.log('Error en getCategoryIcon:', error);
     }
 
     return 'calendar-outline';

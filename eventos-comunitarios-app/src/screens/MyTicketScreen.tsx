@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     Alert,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,19 +74,38 @@ export const MyTicketScreen = () => {
         });
     };
 
+    const formatShortDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('es-EC', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+        });
+    };
+
+    const formatTime = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('es-EC', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
     const getStatusInfo = () => {
         if (ticket?.checkedInAt) {
             return {
                 icon: 'checkmark-circle' as const,
                 color: colors.success,
-                text: 'Ya ingresaste',
+                bgColor: colors.successLight,
+                text: 'YA INGRESASTE',
                 subtext: `Check-in: ${formatDate(ticket.checkedInAt)}`,
             };
         }
         return {
             icon: 'ticket' as const,
             color: colors.primary,
-            text: 'Entrada válida',
+            bgColor: colors.primaryLight + '30',
+            text: 'ENTRADA VÁLIDA',
             subtext: 'Muestra este QR al organizador',
         };
     };
@@ -141,62 +161,111 @@ export const MyTicketScreen = () => {
                 <View style={styles.placeholder} />
             </View>
 
-            {/* Ticket Card */}
-            <View style={styles.ticketCard}>
-                {/* Status Badge */}
-                <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15' }]}>
-                    <Ionicons name={statusInfo.icon} size={20} color={statusInfo.color} />
-                    <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                        {statusInfo.text}
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Ticket Card */}
+                <View style={styles.ticketCard}>
+                    {/* Status Badge */}
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
+                        <Ionicons name={statusInfo.icon} size={18} color={statusInfo.color} />
+                        <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                            {statusInfo.text}
+                        </Text>
+                    </View>
+
+                    {/* Event Title */}
+                    <Text style={styles.eventTitle}>{ticket.eventTitle}</Text>
+
+                    {/* Event Info Cards */}
+                    <View style={styles.infoCardsContainer}>
+                        <View style={styles.infoCard}>
+                            <View style={[styles.infoCardIcon, { backgroundColor: colors.primary + '15' }]}>
+                                <Ionicons name="location" size={18} color={colors.primary} />
+                            </View>
+                            <View style={styles.infoCardContent}>
+                                <Text style={styles.infoCardLabel}>Ubicación</Text>
+                                <Text style={styles.infoCardValue} numberOfLines={2}>
+                                    {ticket.eventLocation}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.infoCard}>
+                            <View style={[styles.infoCardIcon, { backgroundColor: colors.secondary + '15' }]}>
+                                <Ionicons name="calendar" size={18} color={colors.secondary} />
+                            </View>
+                            <View style={styles.infoCardContent}>
+                                <Text style={styles.infoCardLabel}>Fecha y hora</Text>
+                                <Text style={styles.infoCardValue}>
+                                    {formatShortDate(ticket.eventStartDate)}, {formatTime(ticket.eventStartDate)}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Divider with ticket perforation effect */}
+                    <View style={styles.dividerContainer}>
+                        <View style={styles.dividerCircleLeft} />
+                        <View style={styles.dividerDashed} />
+                        <View style={styles.dividerCircleRight} />
+                    </View>
+
+                    {/* QR Code Section */}
+                    <View style={styles.qrSection}>
+                        <View style={styles.qrContainer}>
+                            <QRCode
+                                value={ticket.checkinToken}
+                                size={180}
+                                color="#FFFFFF"
+                                backgroundColor={colors.primary}
+                            />
+                        </View>
+                    </View>
+
+                    {/* User Info */}
+                    <View style={styles.userSection}>
+                        <View style={styles.userAvatar}>
+                            <Ionicons name="person" size={20} color={colors.primary} />
+                        </View>
+                        <Text style={styles.userName}>{ticket.userName}</Text>
+                    </View>
+
+                    {/* Instruction */}
+                    <Text style={styles.instructionText}>{statusInfo.subtext}</Text>
+                </View>
+
+                {/* Additional Info Section */}
+                <View style={styles.additionalInfo}>
+                    <Text style={styles.additionalInfoTitle}>Detalles de la entrada</Text>
+
+                    <View style={styles.detailRow}>
+                        <View style={styles.detailIcon}>
+                            <Ionicons name="ticket-outline" size={16} color={colors.text.secondary} />
+                        </View>
+                        <Text style={styles.detailLabel}>Tipo de entrada</Text>
+                        <Text style={styles.detailValue}>General</Text>
+                    </View>
+
+                    <View style={styles.detailRow}>
+                        <View style={styles.detailIcon}>
+                            <Ionicons name="time-outline" size={16} color={colors.text.secondary} />
+                        </View>
+                        <Text style={styles.detailLabel}>Registrado</Text>
+                        <Text style={styles.detailValue}>{formatShortDate(ticket.registrationDate)}</Text>
+                    </View>
+                </View>
+
+                {/* Bottom Info */}
+                <View style={styles.bottomInfo}>
+                    <Ionicons name="information-circle-outline" size={20} color={colors.text.secondary} />
+                    <Text style={styles.bottomInfoText}>
+                        El organizador escaneará este código para confirmar tu asistencia al evento
                     </Text>
                 </View>
-
-                {/* Event Info */}
-                <Text style={styles.eventTitle}>{ticket.eventTitle}</Text>
-
-                <View style={styles.infoRow}>
-                    <Ionicons name="location" size={16} color={colors.text.secondary} />
-                    <Text style={styles.infoText}>{ticket.eventLocation}</Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                    <Ionicons name="calendar" size={16} color={colors.text.secondary} />
-                    <Text style={styles.infoText}>{formatDate(ticket.eventStartDate)}</Text>
-                </View>
-
-                {/* Divider */}
-                <View style={styles.divider}>
-                    <View style={styles.dividerCircleLeft} />
-                    <View style={styles.dividerLine} />
-                    <View style={styles.dividerCircleRight} />
-                </View>
-
-                {/* QR Code */}
-                <View style={styles.qrContainer}>
-                    <QRCode
-                        value={ticket.checkinToken}
-                        size={200}
-                        color={colors.text.primary}
-                        backgroundColor={colors.surface}
-                    />
-                </View>
-
-                {/* User Info */}
-                <View style={styles.userInfo}>
-                    <Ionicons name="person-circle" size={24} color={colors.primary} />
-                    <Text style={styles.userName}>{ticket.userName}</Text>
-                </View>
-
-                <Text style={styles.instructionText}>{statusInfo.subtext}</Text>
-            </View>
-
-            {/* Bottom Info */}
-            <View style={styles.bottomInfo}>
-                <Ionicons name="information-circle-outline" size={20} color={colors.text.secondary} />
-                <Text style={styles.bottomInfoText}>
-                    El organizador escaneará este código para confirmar tu asistencia
-                </Text>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 };
@@ -205,6 +274,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: spacing.xl,
     },
     loadingContainer: {
         flex: 1,
@@ -265,9 +340,9 @@ const styles = StyleSheet.create({
         color: colors.text.inverse,
     },
     ticketCard: {
-        margin: spacing.lg,
+        margin: spacing.md,
         backgroundColor: colors.surface,
-        borderRadius: borderRadius.xl,
+        borderRadius: borderRadius.xxl,
         padding: spacing.lg,
         alignItems: 'center',
         ...shadows.lg,
@@ -281,85 +356,162 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     statusText: {
-        ...typography.bodySmall,
-        fontWeight: '600',
+        fontSize: 12,
+        fontWeight: '700',
         marginLeft: spacing.xs,
+        letterSpacing: 0.5,
     },
     eventTitle: {
         ...typography.h4,
         color: colors.text.primary,
         textAlign: 'center',
-        marginBottom: spacing.md,
+        marginBottom: spacing.lg,
     },
-    infoRow: {
+    infoCardsContainer: {
+        width: '100%',
+        gap: spacing.sm,
+    },
+    infoCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.xs,
+        backgroundColor: colors.background,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
     },
-    infoText: {
-        ...typography.bodySmall,
+    infoCardIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    infoCardContent: {
+        marginLeft: spacing.md,
+        flex: 1,
+    },
+    infoCardLabel: {
+        ...typography.caption,
         color: colors.text.secondary,
-        marginLeft: spacing.xs,
+        marginBottom: 2,
     },
-    divider: {
+    infoCardValue: {
+        ...typography.bodySmall,
+        color: colors.text.primary,
+        fontWeight: '500',
+    },
+    dividerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         width: '100%',
         marginVertical: spacing.lg,
+        overflow: 'visible',
     },
     dividerCircleLeft: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         backgroundColor: colors.background,
-        marginLeft: -spacing.lg - 10,
+        marginLeft: -spacing.lg - 12,
     },
-    dividerLine: {
+    dividerDashed: {
         flex: 1,
-        height: 1,
-        backgroundColor: colors.border,
+        height: 2,
         borderStyle: 'dashed',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 1,
     },
     dividerCircleRight: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         backgroundColor: colors.background,
-        marginRight: -spacing.lg - 10,
+        marginRight: -spacing.lg - 12,
+    },
+    qrSection: {
+        alignItems: 'center',
+        marginBottom: spacing.lg,
     },
     qrContainer: {
         padding: spacing.md,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        borderWidth: 2,
-        borderColor: colors.border,
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.xl,
+        ...shadows.md,
     },
-    userInfo: {
+    userSection: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: spacing.lg,
+        marginBottom: spacing.sm,
+    },
+    userAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.primary + '15',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.sm,
     },
     userName: {
         ...typography.h5,
         color: colors.text.primary,
-        marginLeft: spacing.sm,
     },
     instructionText: {
-        ...typography.caption,
-        color: colors.text.secondary,
+        ...typography.bodySmall,
+        color: colors.primary,
+        fontWeight: '500',
+    },
+    additionalInfo: {
+        marginHorizontal: spacing.md,
         marginTop: spacing.sm,
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
+        padding: spacing.lg,
+        ...shadows.sm,
+    },
+    additionalInfoTitle: {
+        ...typography.bodySmall,
+        color: colors.text.secondary,
+        fontWeight: '600',
+        marginBottom: spacing.md,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderLight,
+    },
+    detailIcon: {
+        width: 24,
+        marginRight: spacing.sm,
+    },
+    detailLabel: {
+        ...typography.bodySmall,
+        color: colors.text.secondary,
+        flex: 1,
+    },
+    detailValue: {
+        ...typography.bodySmall,
+        color: colors.text.primary,
+        fontWeight: '500',
     },
     bottomInfo: {
         flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.md,
+        alignItems: 'flex-start',
+        marginHorizontal: spacing.md,
+        marginTop: spacing.lg,
+        padding: spacing.md,
+        backgroundColor: colors.infoLight,
+        borderRadius: borderRadius.lg,
     },
     bottomInfoText: {
         ...typography.caption,
-        color: colors.text.secondary,
+        color: colors.info,
         marginLeft: spacing.sm,
         flex: 1,
+        lineHeight: 18,
     },
 });

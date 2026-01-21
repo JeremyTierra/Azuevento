@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,8 @@ import {
     ScrollView,
     Alert,
     TouchableOpacity,
+    Image,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +19,7 @@ import type { AuthStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing, typography, shadows, borderRadius } from '../theme';
 
 type RegisterNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
@@ -92,6 +94,9 @@ export const RegisterScreen: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <View style={styles.backgroundOrbTop} pointerEvents="none" />
+            <View style={styles.backgroundOrbBottom} pointerEvents="none" />
             <KeyboardAvoidingView
                 style={styles.container}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -101,17 +106,28 @@ export const RegisterScreen: React.FC = () => {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.header}>
+                        <View style={styles.logoHalo}>
+                            <Image
+                                source={require('../../assets/logo.png')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
+                            <View style={styles.logoBadge}>
+                                <Ionicons name="sparkles" size={16} color={colors.primary} />
+                            </View>
+                        </View>
                         <View style={styles.logoContainer}>
-                            <Ionicons name="calendar" size={48} color={colors.primary} />
                             <Text style={styles.logoText}>Azuevento</Text>
                         </View>
-                        <Text style={styles.title}>Crear Cuenta</Text>
+                        <Text style={styles.tagline}>Eventos de tu comunidad</Text>
+                    </View>
+
+                    <View style={styles.card}>
+                        <Text style={styles.title}>Crea tu cuenta</Text>
                         <Text style={styles.subtitle}>
                             Únete a la comunidad y descubre eventos increíbles
                         </Text>
-                    </View>
 
-                    <View style={styles.form}>
                         <Input
                             label="Nombre completo"
                             placeholder="Juan Pérez"
@@ -120,10 +136,11 @@ export const RegisterScreen: React.FC = () => {
                             error={errors.name}
                             autoCapitalize="words"
                             autoCorrect={false}
+                            icon="person-outline"
                         />
 
                         <Input
-                            label="Email"
+                            label="Correo electrónico"
                             placeholder="juan@email.com"
                             value={formData.email}
                             onChangeText={(text) => updateField('email', text)}
@@ -131,6 +148,7 @@ export const RegisterScreen: React.FC = () => {
                             keyboardType="email-address"
                             autoCapitalize="none"
                             autoCorrect={false}
+                            icon="mail-outline"
                         />
 
                         <Input
@@ -141,6 +159,7 @@ export const RegisterScreen: React.FC = () => {
                             error={errors.password}
                             secureTextEntry
                             autoCapitalize="none"
+                            icon="lock-closed-outline"
                         />
 
                         <Input
@@ -151,6 +170,7 @@ export const RegisterScreen: React.FC = () => {
                             error={errors.confirmPassword}
                             secureTextEntry
                             autoCapitalize="none"
+                            icon="shield-checkmark-outline"
                         />
 
                         <Button
@@ -158,6 +178,7 @@ export const RegisterScreen: React.FC = () => {
                             onPress={handleRegister}
                             loading={loading}
                             fullWidth
+                            style={styles.primaryButton}
                         />
 
                         <View style={styles.termsContainer}>
@@ -191,37 +212,97 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
-        padding: spacing.lg,
-        justifyContent: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.xxl,
+    },
+    backgroundOrbTop: {
+        position: 'absolute',
+        top: -140,
+        right: -80,
+        width: 220,
+        height: 220,
+        borderRadius: 110,
+        backgroundColor: colors.primaryLight,
+        opacity: 0.1,
+    },
+    backgroundOrbBottom: {
+        position: 'absolute',
+        bottom: -180,
+        left: -100,
+        width: 260,
+        height: 260,
+        borderRadius: 130,
+        backgroundColor: colors.primaryLight,
+        opacity: 0.08,
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing.xl,
+        marginBottom: spacing.lg,
+    },
+    logoHalo: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.md,
+        ...shadows.md,
+    },
+    logoImage: {
+        width: 68,
+        height: 68,
+    },
+    logoBadge: {
+        position: 'absolute',
+        bottom: -6,
+        right: -6,
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.full,
+        padding: spacing.xs,
+        borderWidth: 1,
+        borderColor: colors.borderLight,
+        ...shadows.sm,
     },
     logoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-        marginBottom: spacing.md,
+        gap: spacing.xs,
     },
     logoText: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: '700',
         color: colors.primary,
     },
+    tagline: {
+        fontSize: typography.bodySmall.fontSize,
+        color: colors.text.secondary,
+        marginTop: spacing.xs,
+    },
     title: {
-        fontSize: typography.h1.fontSize,
-        fontWeight: typography.h1.fontWeight,
+        fontSize: typography.h3.fontSize,
+        fontWeight: typography.h3.fontWeight,
         color: colors.text.primary,
-        marginBottom: spacing.xs,
+        textAlign: 'center',
     },
     subtitle: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
         textAlign: 'center',
+        marginTop: spacing.xs,
+        marginBottom: spacing.lg,
     },
-    form: {
-        marginBottom: spacing.xl,
+    card: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
+        padding: spacing.lg,
+        marginTop: spacing.md,
+        ...shadows.md,
+    },
+    primaryButton: {
+        borderRadius: borderRadius.lg,
+        ...shadows.sm,
     },
     termsContainer: {
         marginTop: spacing.md,
@@ -240,6 +321,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        gap: spacing.xs,
+        marginTop: spacing.lg,
     },
     footerText: {
         fontSize: typography.body.fontSize,
