@@ -12,7 +12,9 @@ import {
     TextInput,
     Keyboard,
     Image,
+    Animated,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Callout, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +45,56 @@ const DEFAULT_REGION = {
     longitudeDelta: 0.0421,
 };
 
+// Función para obtener color según categoría
+const getCategoryColor = (categoryName: string | undefined): string => {
+    if (!categoryName) return '#7FB3F0'; // primaryLight por defecto
+    
+    const categoryColors: Record<string, string> = {
+        // Colores que armonizan con el tema Azul Cuenca (#4A90E2), Terracota (#E07B39), Dorado (#F4B942)
+        'Sports': '#F0A066',       // secondaryLight - Terracota claro
+        'Music': '#A78BFA',        // Púrpura suave compatible
+        'Culture': '#F0A066',      // secondaryLight - Terracota 
+        'Technology': '#7FB3F0',   // primaryLight - Azul Cuenca claro
+        'Education': '#7FB3F0',    // primaryLight - Azul Cuenca claro
+        'Gastronomy': '#F7CC6F',   // accentLight - Dorado claro
+        'Social': '#6BCF91',       // Verde suave compatible con success
+        'Business': '#94A3B8',     // text.disabled - Gris neutro
+        'Health': '#6BCF91',       // Verde suave
+        'Nature': '#6BCF91',       // Verde suave
+        'Entertainment': '#C96A2E', // secondaryDark - Terracota oscuro
+        'Other': '#94A3B8',        // text.disabled - Gris neutro
+        
+        // Español (por si acaso)
+        'Deportes': '#F0A066',
+        'Música': '#A78BFA',
+        'Cultura': '#F0A066',
+        'Tecnología': '#7FB3F0',
+        'Educación': '#7FB3F0',
+        'Gastronomía': '#F7CC6F',
+        'Social': '#6BCF91',
+        'Negocios': '#94A3B8',
+        'Salud': '#6BCF91',
+        'Naturaleza': '#6BCF91',
+        'Entretenimiento': '#C96A2E',
+        'Otro': '#94A3B8',
+    };
+    
+    // Buscar coincidencia exacta
+    if (categoryColors[categoryName]) {
+        return categoryColors[categoryName];
+    }
+    
+    // Buscar coincidencia parcial
+    const lowerName = categoryName.toLowerCase();
+    for (const [key, value] of Object.entries(categoryColors)) {
+        if (key.toLowerCase().includes(lowerName) || lowerName.includes(key.toLowerCase())) {
+            return value;
+        }
+    }
+    
+    return '#7FB3F0'; // primaryLight por defecto
+};
+
 type MapScreenNavigationProp = NativeStackNavigationProp<MapStackParamList, 'MapMain'>;
 
 export const MapScreen: React.FC = () => {
@@ -70,16 +122,62 @@ export const MapScreen: React.FC = () => {
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
 
-    // Filtered events based on search
+    // Category filter
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+    // Card minimized state
+    const [isCardMinimized, setIsCardMinimized] = useState(false);
+
+    // Animations
+    const cardSlideAnim = useRef(new Animated.Value(100)).current;
+
+    // Animate card when event selected
+    useEffect(() => {
+        if (selectedEvent) {
+            setIsCardMinimized(false);
+            Animated.spring(cardSlideAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                friction: 8,
+                tension: 40,
+            }).start();
+        } else {
+            cardSlideAnim.setValue(100);
+        }
+    }, [selectedEvent]);
+
+    // Toggle card minimize
+    const toggleCardMinimize = () => {
+        setIsCardMinimized(!isCardMinimized);
+    };
+
+    // Get unique categories
+    const categories = useMemo(() => {
+        const uniqueCategories = [...new Set(events.map(e => e.categoryName))];
+        return uniqueCategories.sort();
+    }, [events]);
+
+    // Filtered events based on search and category
     const filteredEvents = useMemo(() => {
-        if (!searchQuery.trim()) return events;
-        const query = searchQuery.toLowerCase();
-        return events.filter(event =>
-            event.title.toLowerCase().includes(query) ||
-            event.location.toLowerCase().includes(query) ||
-            event.categoryName.toLowerCase().includes(query)
-        );
-    }, [events, searchQuery]);
+        let result = events;
+
+        // Filter by category
+        if (selectedCategory) {
+            result = result.filter(event => event.categoryName === selectedCategory);
+        }
+
+        // Filter by search query
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            result = result.filter(event =>
+                (event.title && event.title.toLowerCase().includes(query)) ||
+                (event.location && event.location.toLowerCase().includes(query)) ||
+                (event.categoryName && event.categoryName.toLowerCase().includes(query))
+            );
+        }
+
+        return result;
+    }, [events, searchQuery, selectedCategory]);
 
     // Reload events when screen gains focus (e.g., after creating an event)
     useFocusEffect(
@@ -142,6 +240,10 @@ export const MapScreen: React.FC = () => {
             const eventsWithLocation = data.filter(
                 (event) => event.latitude && event.longitude
             );
+            // Log para verificar categorías
+            if (eventsWithLocation.length > 0) {
+                console.log('📍 Categoría ejemplo:', eventsWithLocation[0].categoryName);
+            }
             setEvents(eventsWithLocation);
         } catch (error: any) {
             console.error('Error loading events:', error);
@@ -383,7 +485,14 @@ export const MapScreen: React.FC = () => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <View style={styles.loadingContent}>
+                    <View style={styles.loadingIconContainer}>
+                        <Ionicons name="map" size={32} color={colors.primary} />
+                    </View>
+                    <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.md }} />
+                    <Text style={styles.loadingText}>Cargando mapa...</Text>
+                    <Text style={styles.loadingSubtext}>Buscando eventos cerca de ti</Text>
+                </View>
             </View>
         );
     }
@@ -403,33 +512,23 @@ export const MapScreen: React.FC = () => {
                     Keyboard.dismiss();
                 }}
             >
-                {filteredEvents.map((event) => (
-                    <Marker
-                        key={event.id}
-                        coordinate={{
-                            latitude: event.latitude!,
-                            longitude: event.longitude!,
-                        }}
-                        onPress={() => handleMarkerPress(event)}
-                    >
-                        <View style={styles.markerContainer}>
-                            <View style={[
-                                styles.marker,
-                                selectedEvent?.id === event.id && styles.markerSelected
-                            ]}>
-                                <Ionicons
-                                    name={getCategoryIcon(event.categoryName) as any}
-                                    size={selectedEvent?.id === event.id ? 20 : 16}
-                                    color={colors.text.inverse}
-                                />
-                            </View>
-                            <View style={[
-                                styles.markerTail,
-                                selectedEvent?.id === event.id && styles.markerTailSelected
-                            ]} />
-                        </View>
-                    </Marker>
-                ))}
+                {filteredEvents.map((event) => {
+                    const isSelected = selectedEvent?.id === event.id;
+                    const categoryColor = getCategoryColor(event.categoryName);
+                    const markerColor = isSelected ? '#22c55e' : categoryColor;
+                    
+                    return (
+                        <Marker
+                            key={`${event.id}-${markerColor}`}
+                            coordinate={{
+                                latitude: event.latitude!,
+                                longitude: event.longitude!,
+                            }}
+                            onPress={() => handleMarkerPress(event)}
+                            pinColor={markerColor}
+                        />
+                    );
+                })}
 
                 {showDirections && routeCoordinates.length > 0 && (
                     <Polyline
@@ -449,7 +548,7 @@ export const MapScreen: React.FC = () => {
                         <Ionicons
                             name="search"
                             size={18}
-                            color={isSearchFocused ? colors.text.inverse : colors.primary}
+                            color={colors.text.inverse}
                         />
                     </View>
                     <TextInput
@@ -555,11 +654,67 @@ export const MapScreen: React.FC = () => {
                         )}
                     </View>
                 )}
+
+                {/* Category Filter Chips */}
+                {!showSearchResults && categories.length > 0 && (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.categoryScroll}
+                        contentContainerStyle={styles.categoryContainer}
+                    >
+                        <TouchableOpacity
+                            style={[
+                                styles.categoryChip,
+                                !selectedCategory && styles.categoryChipActive,
+                            ]}
+                            onPress={() => setSelectedCategory(null)}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="apps"
+                                size={14}
+                                color={!selectedCategory ? colors.text.inverse : colors.text.secondary}
+                            />
+                            <Text style={[
+                                styles.categoryChipText,
+                                !selectedCategory && styles.categoryChipTextActive,
+                            ]}>
+                                Todos
+                            </Text>
+                        </TouchableOpacity>
+                        {categories.map((category) => (
+                            <TouchableOpacity
+                                key={category}
+                                style={[
+                                    styles.categoryChip,
+                                    selectedCategory === category && styles.categoryChipActive,
+                                ]}
+                                onPress={() => setSelectedCategory(
+                                    selectedCategory === category ? null : category
+                                )}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons
+                                    name={getCategoryIcon(category) as any}
+                                    size={14}
+                                    color={selectedCategory === category ? colors.text.inverse : colors.text.secondary}
+                                />
+                                <Text style={[
+                                    styles.categoryChipText,
+                                    selectedCategory === category && styles.categoryChipTextActive,
+                                ]}>
+                                    {category}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                )}
             </View>
 
             {/* Map Controls */}
             {!showDirections && (
-                <View style={[styles.mapControls, { top: insets.top + 90 }]}>
+                <View style={[styles.mapControls, { top: insets.top + 140 }]}>
                     <TouchableOpacity
                         style={styles.mapButton}
                         onPress={centerOnUser}
@@ -589,7 +744,7 @@ export const MapScreen: React.FC = () => {
             {/* Close Directions Button */}
             {showDirections && (
                 <TouchableOpacity
-                    style={[styles.closeButton, { top: insets.top + 80 }]}
+                    style={[styles.closeButton, { top: insets.top + 140 }]}
                     onPress={closeDirections}
                     activeOpacity={0.8}
                 >
@@ -600,16 +755,84 @@ export const MapScreen: React.FC = () => {
             {/* Empty State */}
             {filteredEvents.length === 0 && !loading && (
                 <View style={styles.emptyState}>
-                    <Ionicons name="location-outline" size={48} color={colors.text.disabled} />
-                    <Text style={styles.emptyText}>
-                        {searchQuery ? 'Sin resultados' : 'No hay eventos con ubicación'}
+                    <View style={styles.emptyStateIcon}>
+                        <Ionicons name="location-outline" size={40} color={colors.primary} />
+                    </View>
+                    <Text style={styles.emptyTitle}>
+                        {searchQuery || selectedCategory ? 'Sin resultados' : 'Sin eventos en el mapa'}
                     </Text>
+                    <Text style={styles.emptyText}>
+                        {searchQuery || selectedCategory
+                            ? 'Intenta con otra búsqueda o categoría'
+                            : 'Los eventos con ubicación aparecerán aquí'}
+                    </Text>
+                    {(searchQuery || selectedCategory) && (
+                        <TouchableOpacity
+                            style={styles.emptyButton}
+                            onPress={() => {
+                                setSearchQuery('');
+                                setSelectedCategory(null);
+                            }}
+                        >
+                            <Text style={styles.emptyButtonText}>Limpiar filtros</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             )}
 
             {/* Directions Card */}
             {showDirections && selectedEvent && (
-                <View style={[styles.bottomCard, { paddingBottom: insets.bottom + spacing.md }]}>
+                <Animated.View style={[
+                    styles.bottomCard,
+                    {
+                        paddingBottom: insets.bottom + spacing.md,
+                        transform: [{ translateY: cardSlideAnim }]
+                    }
+                ]}>
+                    {/* Handle indicator */}
+                    <View style={styles.cardHandleContainer}>
+                        <View style={styles.cardHandle} />
+                    </View>
+
+                    {/* Minimized Header - Touchable to toggle */}
+                    <TouchableOpacity
+                        style={styles.minimizedHeader}
+                        onPress={toggleCardMinimize}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.minimizedEventInfo}>
+                            <View style={[styles.minimizedIcon, { backgroundColor: colors.successLight }]}>
+                                <Ionicons name="navigate" size={16} color={colors.success} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.minimizedTitle} numberOfLines={1}>
+                                    {selectedEvent.title}
+                                </Text>
+                                {routeInfo && (
+                                    <Text style={styles.minimizedSubtitle}>
+                                        {formatRouteDuration(routeInfo.duration)} • {formatRouteDistance(routeInfo.distance)}
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+                        <View style={styles.minimizedToggle}>
+                            <Ionicons
+                                name={isCardMinimized ? 'chevron-up' : 'chevron-down'}
+                                size={20}
+                                color={colors.text.secondary}
+                            />
+                        </View>
+                        <TouchableOpacity
+                            style={styles.minimizedCloseButton}
+                            onPress={closeDirections}
+                        >
+                            <Ionicons name="close" size={18} color={colors.text.secondary} />
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+
+                    {/* Expandable Content */}
+                    {!isCardMinimized && (
+                        <>
                     {/* Transport Modes */}
                     <ScrollView
                         horizontal
@@ -646,12 +869,18 @@ export const MapScreen: React.FC = () => {
                     {routeInfo && (
                         <View style={styles.routeInfo}>
                             <View style={styles.routeInfoItem}>
+                                <View style={styles.routeInfoIconContainer}>
+                                    <Ionicons name="time-outline" size={18} color={colors.primary} />
+                                </View>
                                 <Text style={styles.routeInfoValue}>{formatRouteDuration(routeInfo.duration)}</Text>
-                                <Text style={styles.routeInfoLabel}>tiempo</Text>
+                                <Text style={styles.routeInfoLabel}>tiempo estimado</Text>
                             </View>
                             <View style={styles.routeInfoDivider} />
                             <View style={styles.routeInfoItem}>
-                                <Text style={styles.routeInfoValue}>{formatRouteDistance(routeInfo.distance)}</Text>
+                                <View style={styles.routeInfoIconContainer}>
+                                    <Ionicons name="speedometer-outline" size={18} color={colors.success} />
+                                </View>
+                                <Text style={[styles.routeInfoValue, { color: colors.success }]}>{formatRouteDistance(routeInfo.distance)}</Text>
                                 <Text style={styles.routeInfoLabel}>distancia</Text>
                             </View>
                         </View>
@@ -660,16 +889,19 @@ export const MapScreen: React.FC = () => {
                     {loadingLocation && (
                         <View style={styles.loadingRoute}>
                             <ActivityIndicator size="small" color={colors.primary} />
-                            <Text style={styles.loadingRouteText}>Calculando...</Text>
+                            <Text style={styles.loadingRouteText}>Calculando ruta...</Text>
                         </View>
                     )}
 
                     {/* Destination */}
                     <View style={styles.destination}>
-                        <View style={styles.destinationIcon}>
-                            <Ionicons name="location" size={18} color={colors.primary} />
+                        <View style={styles.destinationIconPulse}>
+                            <View style={styles.destinationIcon}>
+                                <Ionicons name="location" size={18} color={colors.primary} />
+                            </View>
                         </View>
                         <View style={styles.destinationText}>
+                            <Text style={styles.destinationLabel}>Destino</Text>
                             <Text style={styles.destinationTitle} numberOfLines={1}>{selectedEvent.title}</Text>
                             <Text style={styles.destinationSubtitle} numberOfLines={1}>{selectedEvent.location}</Text>
                         </View>
@@ -682,52 +914,117 @@ export const MapScreen: React.FC = () => {
                             onPress={() => openExternalMaps(selectedEvent)}
                         >
                             <Ionicons name="navigate" size={18} color={colors.text.inverse} />
-                            <Text style={styles.primaryButtonText}>Abrir en Maps</Text>
+                            <Text style={styles.primaryButtonText}>Iniciar navegación</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.secondaryButton}
                             onPress={() => handleEventPress(selectedEvent.id)}
                         >
                             <Text style={styles.secondaryButtonText}>Ver evento</Text>
+                            <Ionicons name="chevron-forward" size={16} color={colors.text.primary} />
                         </TouchableOpacity>
                     </View>
-                </View>
+                        </>
+                    )}
+                </Animated.View>
             )}
 
             {/* Selected Event Card */}
             {selectedEvent && !showDirections && (
-                <View style={[styles.bottomCard, { paddingBottom: insets.bottom + spacing.md }]}>
-                    {/* Close button */}
-                    <TouchableOpacity
-                        style={styles.cardCloseButton}
-                        onPress={() => setSelectedEvent(null)}
-                    >
-                        <Ionicons name="close" size={20} color={colors.text.secondary} />
-                    </TouchableOpacity>
+                <Animated.View style={[
+                    styles.bottomCard,
+                    {
+                        paddingBottom: insets.bottom + spacing.md,
+                        transform: [{ translateY: cardSlideAnim }]
+                    }
+                ]}>
+                    {/* Handle indicator */}
+                    <View style={styles.cardHandleContainer}>
+                        <View style={styles.cardHandle} />
+                    </View>
 
-                    {/* Event content with image */}
-                    <View style={styles.eventContent}>
-                        {/* Image or placeholder */}
-                        {selectedEvent.coverImage ? (
-                            <Image
-                                source={{ uri: selectedEvent.coverImage }}
-                                style={styles.eventImage}
-                                resizeMode="cover"
-                            />
-                        ) : (
-                            <View style={styles.eventImagePlaceholder}>
+                    {/* Minimized Header - Touchable to toggle */}
+                    <TouchableOpacity
+                        style={styles.minimizedHeader}
+                        onPress={toggleCardMinimize}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.minimizedEventInfo}>
+                            <View style={styles.minimizedIcon}>
                                 <Ionicons
                                     name={getCategoryIcon(selectedEvent.categoryName) as any}
-                                    size={28}
+                                    size={16}
                                     color={colors.primary}
                                 />
                             </View>
-                        )}
+                            <Text style={styles.minimizedTitle} numberOfLines={1}>
+                                {selectedEvent.title}
+                            </Text>
+                        </View>
+                        <View style={styles.minimizedToggle}>
+                            <Ionicons
+                                name={isCardMinimized ? 'chevron-up' : 'chevron-down'}
+                                size={20}
+                                color={colors.text.secondary}
+                            />
+                        </View>
+                        <TouchableOpacity
+                            style={styles.minimizedCloseButton}
+                            onPress={() => setSelectedEvent(null)}
+                        >
+                            <Ionicons name="close" size={18} color={colors.text.secondary} />
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+
+                    {/* Expandable Content */}
+                    {!isCardMinimized && (
+                        <>
+                            {/* Event content with image */}
+                            <View style={styles.eventContent}>
+                        {/* Image or placeholder */}
+                        <View style={styles.eventImageContainer}>
+                            {selectedEvent.coverImage ? (
+                                <Image
+                                    source={{ uri: selectedEvent.coverImage }}
+                                    style={styles.eventImage}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <LinearGradient
+                                    colors={[colors.primary, colors.primaryDark]}
+                                    style={styles.eventImagePlaceholder}
+                                >
+                                    <Ionicons
+                                        name={getCategoryIcon(selectedEvent.categoryName) as any}
+                                        size={28}
+                                        color={colors.text.inverse}
+                                    />
+                                </LinearGradient>
+                            )}
+                            {/* Participant count overlay */}
+                            <View style={styles.participantOverlay}>
+                                <Ionicons name="people" size={12} color={colors.text.inverse} />
+                                <Text style={styles.participantCount}>{selectedEvent.participantCount}</Text>
+                            </View>
+                        </View>
 
                         {/* Event details */}
                         <View style={styles.eventDetails}>
-                            <View style={styles.categoryBadge}>
-                                <Text style={styles.categoryText}>{selectedEvent.categoryName}</Text>
+                            <View style={styles.eventHeaderRow}>
+                                <View style={styles.categoryBadge}>
+                                    <Ionicons
+                                        name={getCategoryIcon(selectedEvent.categoryName) as any}
+                                        size={10}
+                                        color={colors.primary}
+                                    />
+                                    <Text style={styles.categoryText}>{selectedEvent.categoryName}</Text>
+                                </View>
+                                {selectedEvent.averageRating && selectedEvent.averageRating > 0 && (
+                                    <View style={styles.ratingBadge}>
+                                        <Ionicons name="star" size={10} color={colors.warning} />
+                                        <Text style={styles.ratingText}>{selectedEvent.averageRating.toFixed(1)}</Text>
+                                    </View>
+                                )}
                             </View>
 
                             <Text style={styles.eventTitle} numberOfLines={2}>{selectedEvent.title}</Text>
@@ -740,8 +1037,10 @@ export const MapScreen: React.FC = () => {
                             </View>
 
                             <View style={styles.eventInfo}>
-                                <Ionicons name="location-outline" size={14} color={colors.text.secondary} />
-                                <Text style={styles.eventInfoText} numberOfLines={1}>{selectedEvent.location}</Text>
+                                <Ionicons name="location-outline" size={14} color={colors.primary} />
+                                <Text style={[styles.eventInfoText, { color: colors.primary }]} numberOfLines={1}>
+                                    {selectedEvent.location}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -767,10 +1066,12 @@ export const MapScreen: React.FC = () => {
                             onPress={() => handleEventPress(selectedEvent.id)}
                         >
                             <Text style={styles.secondaryButtonText}>Ver detalles</Text>
-                            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                            <Ionicons name="chevron-forward" size={16} color={colors.text.primary} />
                         </TouchableOpacity>
                     </View>
-                </View>
+                        </>
+                    )}
+                </Animated.View>
             )}
         </View>
     );
@@ -787,6 +1088,28 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: colors.background,
     },
+    loadingContent: {
+        alignItems: 'center',
+    },
+    loadingIconContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '600',
+        color: colors.text.primary,
+        marginTop: spacing.lg,
+    },
+    loadingSubtext: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
+        marginTop: spacing.xs,
+    },
     map: {
         flex: 1,
     },
@@ -800,30 +1123,36 @@ const styles = StyleSheet.create({
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.surface,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderRadius: borderRadius.full,
         paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
+        paddingVertical: spacing.sm,
         gap: spacing.sm,
-        borderWidth: 1.5,
-        borderColor: colors.border,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.8)',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowRadius: 16,
+        elevation: 10,
     },
     searchBarFocused: {
         borderColor: colors.primary,
-        backgroundColor: colors.surface,
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        shadowOpacity: 0.2,
     },
     searchIconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.primaryLight,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
     },
     searchInput: {
         flex: 1,
@@ -938,6 +1267,43 @@ const styles = StyleSheet.create({
         fontSize: typography.body.fontSize,
         color: colors.text.disabled,
     },
+    // Category Filter
+    categoryScroll: {
+        marginTop: spacing.sm,
+        marginHorizontal: -spacing.md,
+    },
+    categoryContainer: {
+        paddingHorizontal: spacing.md,
+        gap: spacing.sm,
+    },
+    categoryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.xs,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    categoryChipActive: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+    categoryChipText: {
+        fontSize: typography.caption.fontSize,
+        fontWeight: '600',
+        color: colors.text.secondary,
+    },
+    categoryChipTextActive: {
+        color: colors.text.inverse,
+    },
     // Map Controls
     mapControls: {
         position: 'absolute',
@@ -945,94 +1311,111 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
     },
     mapButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: colors.surface,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: 'rgba(255, 255, 255, 0.8)',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
     },
     closeButton: {
         position: 'absolute',
         right: spacing.md,
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    // Markers
-    markerContainer: {
-        alignItems: 'center',
-    },
-    marker: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        borderColor: colors.surface,
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 6,
-        elevation: 8,
-    },
-    markerSelected: {
-        backgroundColor: colors.success,
         width: 48,
         height: 48,
         borderRadius: 24,
-        borderWidth: 4,
-        shadowColor: colors.success,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.8)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
     },
-    markerTail: {
+    // Custom map marker
+    markerContainer: {
+        alignItems: 'center',
+        width: 40,
+        height: 50,
+    },
+    markerBubble: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+    },
+    markerTriangle: {
         width: 0,
         height: 0,
-        borderLeftWidth: 8,
-        borderRightWidth: 8,
-        borderTopWidth: 10,
+        backgroundColor: 'transparent',
+        borderStyle: 'solid',
+        borderLeftWidth: 5,
+        borderRightWidth: 5,
+        borderTopWidth: 8,
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
-        borderTopColor: colors.primary,
-        marginTop: -4,
-    },
-    markerTailSelected: {
-        borderTopColor: colors.success,
-        borderLeftWidth: 10,
-        borderRightWidth: 10,
-        borderTopWidth: 12,
+        marginTop: -1,
     },
     // Empty State
     emptyState: {
         position: 'absolute',
-        top: '50%',
-        left: 0,
-        right: 0,
+        top: '45%',
+        left: spacing.xl,
+        right: spacing.xl,
         alignItems: 'center',
-        marginTop: -50,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: borderRadius.xxl,
+        padding: spacing.xl,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+    },
+    emptyStateIcon: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    emptyTitle: {
+        fontSize: typography.h5.fontSize,
+        fontWeight: '700',
+        color: colors.text.primary,
+        marginBottom: spacing.xs,
     },
     emptyText: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
-        marginTop: spacing.sm,
+        textAlign: 'center',
+    },
+    emptyButton: {
+        marginTop: spacing.lg,
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.md,
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.full,
+    },
+    emptyButtonText: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '600',
+        color: colors.text.inverse,
     },
     // Bottom Card
     bottomCard: {
@@ -1041,14 +1424,74 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: colors.surface,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: spacing.lg,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+        paddingTop: spacing.md,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
+        shadowOffset: { width: 0, height: -8 },
         shadowOpacity: 0.15,
-        shadowRadius: 16,
-        elevation: 12,
+        shadowRadius: 24,
+        elevation: 20,
+    },
+    cardHandleContainer: {
+        alignItems: 'center',
+        paddingVertical: spacing.xs,
+        marginBottom: spacing.sm,
+    },
+    cardHandle: {
+        width: 48,
+        height: 5,
+        backgroundColor: colors.border,
+        borderRadius: 3,
+    },
+    minimizedHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: spacing.sm,
+    },
+    minimizedEventInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: spacing.sm,
+    },
+    minimizedIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    minimizedTitle: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '600',
+        color: colors.text.primary,
+    },
+    minimizedSubtitle: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
+        marginTop: 2,
+    },
+    minimizedToggle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    minimizedCloseButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: spacing.sm,
     },
     // Transport
     transportScroll: {
@@ -1087,19 +1530,26 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.primary + '10',
-        borderRadius: borderRadius.lg,
+        backgroundColor: colors.background,
+        borderRadius: borderRadius.xl,
         padding: spacing.md,
         marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.primary + '20',
     },
     routeInfoItem: {
         flex: 1,
         alignItems: 'center',
     },
+    routeInfoIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.primary + '15',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
     routeInfoValue: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '700',
         color: colors.primary,
     },
@@ -1107,13 +1557,12 @@ const styles = StyleSheet.create({
         fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
         marginTop: 2,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
     },
     routeInfoDivider: {
         width: 1,
-        height: 36,
-        backgroundColor: colors.primary + '30',
+        height: 50,
+        backgroundColor: colors.border,
+        marginHorizontal: spacing.sm,
     },
     loadingRoute: {
         flexDirection: 'row',
@@ -1130,22 +1579,33 @@ const styles = StyleSheet.create({
     destination: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.background,
-        borderRadius: borderRadius.md,
+        backgroundColor: colors.primary + '08',
+        borderRadius: borderRadius.lg,
         padding: spacing.md,
         marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.primary + '15',
+    },
+    destinationIconPulse: {
+        marginRight: spacing.md,
     },
     destinationIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: colors.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: spacing.sm,
     },
     destinationText: {
         flex: 1,
+    },
+    destinationLabel: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 2,
     },
     destinationTitle: {
         fontSize: typography.body.fontSize,
@@ -1155,6 +1615,7 @@ const styles = StyleSheet.create({
     destinationSubtitle: {
         fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
+        marginTop: 2,
     },
     // Event Card
     cardCloseButton: {
@@ -1173,48 +1634,89 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: spacing.md,
     },
+    eventImageContainer: {
+        position: 'relative',
+    },
     eventImage: {
-        width: 90,
-        height: 90,
-        borderRadius: borderRadius.lg,
+        width: 110,
+        height: 110,
+        borderRadius: 20,
         backgroundColor: colors.background,
     },
     eventImagePlaceholder: {
-        width: 90,
-        height: 90,
-        borderRadius: borderRadius.lg,
-        backgroundColor: colors.primaryLight,
+        width: 110,
+        height: 110,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    participantOverlay: {
+        position: 'absolute',
+        bottom: spacing.xs,
+        right: spacing.xs,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+        borderRadius: borderRadius.full,
+        gap: 4,
+    },
+    participantCount: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: colors.text.inverse,
     },
     eventDetails: {
         flex: 1,
         paddingRight: spacing.lg,
     },
-    categoryBadge: {
-        alignSelf: 'flex-start',
-        backgroundColor: colors.primaryLight,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 2,
-        borderRadius: borderRadius.full,
+    eventHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
         marginBottom: spacing.xs,
     },
+    categoryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary + '12',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 3,
+        borderRadius: borderRadius.full,
+        gap: 4,
+    },
     categoryText: {
-        fontSize: typography.caption.fontSize,
+        fontSize: 11,
         fontWeight: '600',
         color: colors.primary,
     },
+    ratingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.warning + '15',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 3,
+        borderRadius: borderRadius.full,
+        gap: 3,
+    },
+    ratingText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: colors.warning,
+    },
     eventTitle: {
         fontSize: typography.body.fontSize,
-        fontWeight: '600',
+        fontWeight: '700',
         color: colors.text.primary,
-        marginBottom: spacing.xs,
+        marginBottom: spacing.sm,
+        lineHeight: 22,
     },
     eventInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.xs,
-        marginBottom: 2,
+        marginBottom: spacing.xs,
     },
     eventInfoText: {
         fontSize: typography.caption.fontSize,
@@ -1233,14 +1735,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: colors.primary,
-        paddingVertical: spacing.md + 2,
-        borderRadius: borderRadius.lg,
+        paddingVertical: spacing.md + 4,
+        borderRadius: borderRadius.full,
         gap: spacing.sm,
         shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+        elevation: 6,
     },
     primaryButtonText: {
         fontSize: typography.body.fontSize,
@@ -1252,16 +1754,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.surface,
-        paddingVertical: spacing.md + 2,
-        borderRadius: borderRadius.lg,
+        backgroundColor: colors.background,
+        paddingVertical: spacing.md + 4,
+        borderRadius: borderRadius.full,
         borderWidth: 1.5,
-        borderColor: colors.primary,
+        borderColor: colors.border,
         gap: spacing.xs,
     },
     secondaryButtonText: {
         fontSize: typography.body.fontSize,
         fontWeight: '600',
-        color: colors.primary,
+        color: colors.text.primary,
     },
 });

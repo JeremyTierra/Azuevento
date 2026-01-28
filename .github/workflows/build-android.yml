@@ -1,0 +1,54 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: eventos-comunitarios-app/package-lock.json
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: ./eventos-comunitarios-app
+        run: npm ci
+
+      - name: Build Android APK
+        working-directory: ./eventos-comunitarios-app
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+        
+      - name: Wait for build to complete
+        working-directory: ./eventos-comunitarios-app
+        run: |
+          echo "Build started! Check status at: https://expo.dev"
+          echo "The APK will be available in your Expo dashboard"
+
+      # Opcional: Descargar el APK cuando esté listo
+      # - name: Download APK
+      #   working-directory: ./eventos-comunitarios-app
+      #   run: eas build:list --platform android --status finished --limit 1 --json | jq -r '.[0].artifacts.buildUrl' | xargs wget -O app-release.apk
+      
+      # - name: Upload APK artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: android-apk
+      #     path: eventos-comunitarios-app/app-release.apk
+      #     retention-days: 30

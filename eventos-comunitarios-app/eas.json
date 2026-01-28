@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 3.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://azuevento.onrender.com/api",
+        "EXPO_PUBLIC_ORS_API_KEY": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImM0YTdiNWJmMDhkNjQ3ZDg5MDMwMzZmM2Y0OTgzZTk5IiwiaCI6Im11cm11cjY0In0="
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://azuevento.onrender.com/api",
+        "EXPO_PUBLIC_ORS_API_KEY": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImM0YTdiNWJmMDhkNjQ3ZDg5MDMwMzZmM2Y0OTgzZTk5IiwiaCI6Im11cm11cjY0In0="
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

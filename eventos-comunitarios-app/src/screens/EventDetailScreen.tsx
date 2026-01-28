@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,8 @@ import {
     Linking,
     Platform,
     StatusBar,
+    Animated,
+    Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,9 +32,10 @@ import { RatingStars } from '../components/RatingStars';
 import type { Event } from '../types/models';
 import { colors, spacing, borderRadius, typography, shadows } from '../theme';
 import { formatDate, formatTime, getCategoryIcon } from '../utils/formatters';
+import MapView, { Marker } from 'react-native-maps';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_HEIGHT = 320;
+const HERO_HEIGHT = 380; // Increased for Stitch design
 
 type EventDetailRouteProp = RouteProp<{ EventDetail: { eventId: number } }, 'EventDetail'>;
 type EventDetailNavigationProp = NativeStackNavigationProp<ExploreStackParamList, 'EventDetail'>;
@@ -50,9 +53,31 @@ export const EventDetailScreen: React.FC = () => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [userRating, setUserRating] = useState(0);
 
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+
     useEffect(() => {
         loadEventDetail();
     }, [route.params.eventId]);
+
+    // Animate content when loaded
+    useEffect(() => {
+        if (event) {
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 400,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 400,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [event]);
 
     const loadEventDetail = async () => {
         try {
@@ -157,6 +182,19 @@ export const EventDetailScreen: React.FC = () => {
         }
     };
 
+    // Share event
+    const handleShare = async () => {
+        if (!event) return;
+        try {
+            await Share.share({
+                title: event.title,
+                message: `¡Mira este evento! 🎉\n\n${event.title}\n📍 ${event.location}\n📅 ${formatDate(event.startDate)} a las ${formatTime(event.startDate)}\n\n${event.description?.substring(0, 100)}...`,
+            });
+        } catch (error) {
+            console.error('Error sharing:', error);
+        }
+    };
+
     if (loading || !event) {
         return <Loading message="Cargando evento..." />;
     }
@@ -203,46 +241,41 @@ export const EventDetailScreen: React.FC = () => {
                         style={styles.heroGradient}
                     />
 
-                    {/* Back Button */}
+                    {/* Back Button - Stitch style with dark blur */}
                     <TouchableOpacity
-                        style={[styles.headerButton, styles.backButton, { top: insets.top + spacing.sm }]}
+                        style={[styles.headerButtonBlur, { top: insets.top + spacing.sm, left: spacing.md }]}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+                        <Ionicons name="arrow-back" size={22} color={colors.text.inverse} />
                     </TouchableOpacity>
 
-                    {/* Favorite Button */}
-                    <TouchableOpacity
-                        style={[styles.headerButton, styles.favoriteButton, { top: insets.top + spacing.sm }]}
-                        onPress={handleToggleFavorite}
-                    >
-                        <Ionicons
-                            name={isFavorite ? 'heart' : 'heart-outline'}
-                            size={24}
-                            color={isFavorite ? colors.error : colors.text.primary}
-                        />
-                    </TouchableOpacity>
-
-                    {/* Title and Info on Hero */}
-                    <View style={styles.heroContent}>
-                        {/* Category Badge - more visible */}
-                        <View style={styles.heroCategoryBadge}>
+                    {/* Header Right Buttons - Stitch style */}
+                    <View style={[styles.headerRightButtons, { top: insets.top + spacing.sm }]}>
+                        <TouchableOpacity
+                            style={styles.headerButtonBlurInline}
+                            onPress={handleShare}
+                        >
+                            <Ionicons name="share-outline" size={20} color={colors.text.inverse} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.headerButtonBlurInline}
+                            onPress={handleToggleFavorite}
+                        >
                             <Ionicons
-                                name={getCategoryIcon(event.categoryName) as any}
-                                size={14}
-                                color={colors.text.inverse}
+                                name={isFavorite ? 'heart' : 'heart-outline'}
+                                size={22}
+                                color={isFavorite ? '#FF6B6B' : colors.text.inverse}
                             />
-                            <Text style={styles.heroCategoryText}>{event.categoryName}</Text>
-                        </View>
+                        </TouchableOpacity>
+                    </View>
 
-                        <Text style={styles.heroTitle} numberOfLines={2}>{event.title}</Text>
-
-                        {/* Organizer - more visible with background */}
+                    {/* Organizer Info on Hero */}
+                    <View style={styles.heroContent}>
                         <View style={styles.organizerContainer}>
                             <View style={styles.organizerAvatar}>
                                 <Ionicons name="person" size={16} color={colors.primary} />
                             </View>
-                            <View>
+                            <View style={styles.organizerInfo}>
                                 <Text style={styles.organizerLabel}>Organizado por</Text>
                                 <Text style={styles.organizerName}>{event.organizerName}</Text>
                             </View>
@@ -250,40 +283,105 @@ export const EventDetailScreen: React.FC = () => {
                     </View>
                 </TouchableOpacity>
 
-                {/* Quick Stats Row */}
-                <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                        <View style={[styles.statIcon, { backgroundColor: colors.primary + '15' }]}>
-                            <Ionicons name="people" size={20} color={colors.primary} />
+                {/* Content Section - Overlaps Hero (Stitch style) */}
+                <Animated.View
+                    style={[
+                        styles.contentSection,
+                        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                    ]}
+                >
+                    {/* Category Badge */}
+                    <View style={styles.categoryBadgeContainer}>
+                        <View style={styles.categoryBadge}>
+                            <Ionicons
+                                name={getCategoryIcon(event.categoryName) as any}
+                                size={14}
+                                color={colors.primary}
+                            />
+                            <Text style={styles.categoryBadgeText}>{event.categoryName?.toUpperCase()}</Text>
                         </View>
-                        <Text style={styles.statValue}>{event.participantCount}</Text>
-                        <Text style={styles.statLabel}>Asistentes</Text>
                     </View>
 
-                    <View style={styles.statDivider} />
+                    {/* Event Title in Content */}
+                    <Text style={styles.contentTitle}>{event.title}</Text>
 
-                    <View style={styles.statItem}>
-                        <View style={[styles.statIcon, { backgroundColor: colors.warning + '15' }]}>
-                            <Ionicons name="star" size={20} color={colors.warning} />
+                    {/* Quick Stats Row */}
+                    <View style={styles.statsRow}>
+                        <TouchableOpacity style={styles.statItem} activeOpacity={0.7}>
+                            <View style={[styles.statIcon, { backgroundColor: colors.primary + '15' }]}>
+                                <Ionicons name="people" size={20} color={colors.primary} />
+                            </View>
+                            <Text style={styles.statValue}>{event.participantCount}</Text>
+                            <Text style={styles.statLabel}>Asistentes</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.statDivider} />
+
+                        <TouchableOpacity
+                            style={styles.statItem}
+                            activeOpacity={0.7}
+                            onPress={() => event.hasUserRegistered && setShowRatingModal(true)}
+                        >
+                            <View style={[styles.statIcon, { backgroundColor: colors.warning + '15' }]}>
+                                <Ionicons name="star" size={20} color={colors.warning} />
+                            </View>
+                            <Text style={styles.statValue}>
+                                {event.averageRating ? event.averageRating.toFixed(1) : '-'}
+                            </Text>
+                            <Text style={styles.statLabel}>
+                                {event.ratingCount ? `${event.ratingCount} reseñas` : 'Sin reseñas'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.statDivider} />
+
+                        <TouchableOpacity
+                            style={styles.statItem}
+                            activeOpacity={0.7}
+                            onPress={handleToggleFavorite}
+                        >
+                            <View style={[styles.statIcon, { backgroundColor: colors.error + '15' }]}>
+                                <Ionicons
+                                    name={isFavorite ? 'heart' : 'heart-outline'}
+                                    size={20}
+                                    color={colors.error}
+                                />
+                            </View>
+                            <Text style={styles.statValue}>{event.favoriteCount || 0}</Text>
+                            <Text style={styles.statLabel}>Favoritos</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Animated.View>
+
+                {/* Attendees Section (Stitch style - overlapping avatars) */}
+                {event.participantCount > 0 && (
+                    <View style={styles.attendeesSection}>
+                        <View style={styles.attendeesAvatars}>
+                            {/* Simulated overlapping avatars */}
+                            {[...Array(Math.min(event.participantCount, 4))].map((_, index) => (
+                                <View
+                                    key={index}
+                                    style={[
+                                        styles.attendeeAvatar,
+                                        { marginLeft: index > 0 ? -12 : 0, zIndex: 4 - index }
+                                    ]}
+                                >
+                                    <Ionicons name="person" size={16} color={colors.primary} />
+                                </View>
+                            ))}
+                            {event.participantCount > 4 && (
+                                <View style={[styles.attendeeAvatarMore, { marginLeft: -12 }]}>
+                                    <Text style={styles.attendeeAvatarMoreText}>
+                                        +{event.participantCount - 4}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
-                        <Text style={styles.statValue}>
-                            {event.averageRating ? event.averageRating.toFixed(1) : '-'}
+                        <Text style={styles.attendeesText}>
+                            {event.participantCount} {event.participantCount === 1 ? 'persona asistirá' : 'personas asistirán'}
                         </Text>
-                        <Text style={styles.statLabel}>
-                            {event.ratingCount ? `${event.ratingCount} reseñas` : 'Sin reseñas'}
-                        </Text>
                     </View>
-
-                    <View style={styles.statDivider} />
-
-                    <View style={styles.statItem}>
-                        <View style={[styles.statIcon, { backgroundColor: colors.error + '15' }]}>
-                            <Ionicons name="heart" size={20} color={colors.error} />
-                        </View>
-                        <Text style={styles.statValue}>{event.favoriteCount || 0}</Text>
-                        <Text style={styles.statLabel}>Favoritos</Text>
-                    </View>
-                </View>
+                )}
 
                 {/* Info Cards */}
                 <View style={styles.cardsContainer}>
@@ -304,26 +402,53 @@ export const EventDetailScreen: React.FC = () => {
                         </View>
                     </TouchableOpacity>
 
-                    {/* Location Card */}
+                    {/* Location Card with Map Preview (Stitch style) */}
                     <TouchableOpacity
-                        style={styles.infoCard}
+                        style={styles.locationCard}
                         activeOpacity={0.8}
                         onPress={handleNavigateToMap}
                     >
-                        <View style={[styles.cardIconContainer, { backgroundColor: colors.success + '12' }]}>
-                            <Ionicons name="location" size={24} color={colors.success} />
+                        <View style={styles.locationCardHeader}>
+                            <View style={[styles.cardIconContainer, { backgroundColor: colors.success + '12' }]}>
+                                <Ionicons name="location" size={24} color={colors.success} />
+                            </View>
+                            <View style={styles.cardContent}>
+                                <Text style={styles.cardLabel}>Ubicación</Text>
+                                <Text style={styles.cardValue} numberOfLines={2}>{event.location}</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={colors.text.disabled} />
                         </View>
-                        <View style={styles.cardContent}>
-                            <Text style={styles.cardLabel}>Ubicación</Text>
-                            <Text style={styles.cardValue} numberOfLines={2}>{event.location}</Text>
-                            {(event.latitude && event.longitude) && (
-                                <View style={styles.directionsHint}>
-                                    <Ionicons name="map" size={14} color={colors.primary} />
-                                    <Text style={styles.directionsText}>Ver en mapa</Text>
+                        {/* Mini Map Preview */}
+                        {(event.latitude && event.longitude) && (
+                            <View style={styles.miniMapContainer}>
+                                <MapView
+                                    style={styles.miniMap}
+                                    initialRegion={{
+                                        latitude: event.latitude,
+                                        longitude: event.longitude,
+                                        latitudeDelta: 0.005,
+                                        longitudeDelta: 0.005,
+                                    }}
+                                    scrollEnabled={false}
+                                    zoomEnabled={false}
+                                    rotateEnabled={false}
+                                    pitchEnabled={false}
+                                >
+                                    <Marker
+                                        coordinate={{
+                                            latitude: event.latitude,
+                                            longitude: event.longitude,
+                                        }}
+                                    />
+                                </MapView>
+                                <View style={styles.miniMapOverlay}>
+                                    <View style={styles.miniMapButton}>
+                                        <Ionicons name="navigate" size={16} color={colors.text.inverse} />
+                                        <Text style={styles.miniMapButtonText}>Cómo llegar</Text>
+                                    </View>
                                 </View>
-                            )}
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={colors.text.disabled} />
+                            </View>
+                        )}
                     </TouchableOpacity>
 
                     {/* Capacity Card (if max capacity set) */}
@@ -360,51 +485,95 @@ export const EventDetailScreen: React.FC = () => {
                     )}
                 </View>
 
-                {/* Action Buttons Row */}
-                <View style={styles.actionButtonsRow}>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => navigation.navigate('Comments', {
-                            eventId: event.id,
-                            eventTitle: event.title
-                        })}
+                {/* Action Buttons - Horizontal Scroll */}
+                <View style={styles.actionButtonsSection}>
+                    <Text style={styles.actionSectionTitle}>Acciones rápidas</Text>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.actionButtonsScroll}
                     >
-                        <View style={[styles.actionButtonIcon, { backgroundColor: colors.primary + '12' }]}>
-                            <Ionicons name="chatbubble-outline" size={22} color={colors.primary} />
-                        </View>
-                        <Text style={styles.actionButtonText}>Comentarios</Text>
-                        {event.commentCount > 0 && (
-                            <View style={styles.actionButtonBadge}>
-                                <Text style={styles.actionButtonBadgeText}>{event.commentCount}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-
-                    {event.hasUserRegistered && (
                         <TouchableOpacity
                             style={styles.actionButton}
-                            onPress={() => setShowRatingModal(true)}
+                            onPress={() => navigation.navigate('Comments', {
+                                eventId: event.id,
+                                eventTitle: event.title
+                            })}
                         >
-                            <View style={[styles.actionButtonIcon, { backgroundColor: colors.warning + '12' }]}>
-                                <Ionicons name="star-outline" size={22} color={colors.warning} />
+                            <View style={[styles.actionButtonIcon, { backgroundColor: colors.primary + '15' }]}>
+                                <Ionicons name="chatbubble-outline" size={22} color={colors.primary} />
                             </View>
-                            <Text style={styles.actionButtonText}>Calificar</Text>
+                            <Text style={styles.actionButtonText}>Comentarios</Text>
+                            {event.commentCount > 0 && (
+                                <View style={styles.actionButtonBadge}>
+                                    <Text style={styles.actionButtonBadgeText}>{event.commentCount}</Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
-                    )}
 
-                    <TouchableOpacity style={styles.actionButton} onPress={handleNavigateToMap}>
-                        <View style={[styles.actionButtonIcon, { backgroundColor: colors.success + '12' }]}>
-                            <Ionicons name="map-outline" size={22} color={colors.success} />
-                        </View>
-                        <Text style={styles.actionButtonText}>Ver en mapa</Text>
-                    </TouchableOpacity>
+                        {event.hasUserRegistered && (
+                            <>
+                                <TouchableOpacity
+                                    style={styles.actionButton}
+                                    onPress={() => setShowRatingModal(true)}
+                                >
+                                    <View style={[styles.actionButtonIcon, { backgroundColor: colors.warning + '15' }]}>
+                                        <Ionicons name="star-outline" size={22} color={colors.warning} />
+                                    </View>
+                                    <Text style={styles.actionButtonText}>Calificar</Text>
+                                </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionButton} onPress={handleOpenExternalMaps}>
-                        <View style={[styles.actionButtonIcon, { backgroundColor: colors.secondary + '12' }]}>
-                            <Ionicons name="navigate-outline" size={22} color={colors.secondary} />
-                        </View>
-                        <Text style={styles.actionButtonText}>Abrir Maps</Text>
-                    </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.actionButton, styles.actionButtonHighlight]}
+                                    onPress={() => navigation.navigate('MyTicket', {
+                                        eventId: event.id,
+                                        eventTitle: event.title
+                                    })}
+                                >
+                                    <View style={[styles.actionButtonIcon, { backgroundColor: colors.accent + '20' }]}>
+                                        <Ionicons name="qr-code" size={22} color={colors.accent} />
+                                    </View>
+                                    <Text style={[styles.actionButtonText, { color: colors.accent }]}>Mi Entrada</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+
+                        {isOrganizer && (
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.actionButtonHighlight]}
+                                onPress={() => navigation.navigate('Scanner' as any, {
+                                    eventId: event.id,
+                                    eventTitle: event.title
+                                })}
+                            >
+                                <View style={[styles.actionButtonIcon, { backgroundColor: colors.secondary + '20' }]}>
+                                    <Ionicons name="scan" size={22} color={colors.secondary} />
+                                </View>
+                                <Text style={[styles.actionButtonText, { color: colors.secondary }]}>Escanear</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity style={styles.actionButton} onPress={handleNavigateToMap}>
+                            <View style={[styles.actionButtonIcon, { backgroundColor: colors.success + '15' }]}>
+                                <Ionicons name="map-outline" size={22} color={colors.success} />
+                            </View>
+                            <Text style={styles.actionButtonText}>Ver mapa</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionButton} onPress={handleOpenExternalMaps}>
+                            <View style={[styles.actionButtonIcon, { backgroundColor: colors.info + '15' }]}>
+                                <Ionicons name="navigate-outline" size={22} color={colors.info} />
+                            </View>
+                            <Text style={styles.actionButtonText}>Cómo llegar</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+                            <View style={[styles.actionButtonIcon, { backgroundColor: colors.text.secondary + '15' }]}>
+                                <Ionicons name="share-social-outline" size={22} color={colors.text.secondary} />
+                            </View>
+                            <Text style={styles.actionButtonText}>Compartir</Text>
+                        </TouchableOpacity>
+                    </ScrollView>
                 </View>
 
                 {/* Description Section */}
@@ -468,19 +637,25 @@ export const EventDetailScreen: React.FC = () => {
             <Modal
                 visible={showRatingModal}
                 transparent
-                animationType="fade"
+                animationType="slide"
                 onRequestClose={() => setShowRatingModal(false)}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Califica este evento</Text>
-                            <TouchableOpacity onPress={() => setShowRatingModal(false)}>
-                                <Ionicons name="close" size={24} color={colors.text.secondary} />
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={styles.modalSubtitle}>¿Cómo fue tu experiencia?</Text>
+                        {/* Handle indicator */}
+                        <View style={styles.modalHandle} />
 
+                        {/* Icon and Title */}
+                        <View style={styles.modalIconContainer}>
+                            <View style={styles.modalIconCircle}>
+                                <Ionicons name="star" size={32} color={colors.warning} />
+                            </View>
+                        </View>
+
+                        <Text style={styles.modalTitle}>¿Qué te pareció?</Text>
+                        <Text style={styles.modalSubtitle}>Tu opinión ayuda a otros a descubrir eventos</Text>
+
+                        {/* Rating Stars */}
                         <View style={styles.modalRatingContainer}>
                             <RatingStars
                                 value={userRating}
@@ -488,16 +663,25 @@ export const EventDetailScreen: React.FC = () => {
                                 editable
                                 onChange={setUserRating}
                             />
-                            <Text style={styles.ratingLabel}>
-                                {userRating === 0 && 'Toca para calificar'}
-                                {userRating === 1 && 'Muy malo'}
-                                {userRating === 2 && 'Malo'}
-                                {userRating === 3 && 'Regular'}
-                                {userRating === 4 && 'Bueno'}
-                                {userRating === 5 && '¡Excelente!'}
-                            </Text>
+                            <View style={[
+                                styles.ratingLabelContainer,
+                                userRating > 0 && styles.ratingLabelContainerActive
+                            ]}>
+                                <Text style={[
+                                    styles.ratingLabel,
+                                    userRating > 0 && styles.ratingLabelActive
+                                ]}>
+                                    {userRating === 0 && 'Toca una estrella'}
+                                    {userRating === 1 && 'Muy malo'}
+                                    {userRating === 2 && 'Podría mejorar'}
+                                    {userRating === 3 && 'Regular'}
+                                    {userRating === 4 && '¡Muy bueno!'}
+                                    {userRating === 5 && '¡Increíble!'}
+                                </Text>
+                            </View>
                         </View>
 
+                        {/* Buttons */}
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
                                 style={[styles.modalButton, styles.modalButtonCancel]}
@@ -514,6 +698,12 @@ export const EventDetailScreen: React.FC = () => {
                                 onPress={() => handleRateEvent(userRating)}
                                 disabled={userRating === 0}
                             >
+                                <Ionicons
+                                    name="send"
+                                    size={18}
+                                    color={colors.text.inverse}
+                                    style={{ marginRight: spacing.xs }}
+                                />
                                 <Text style={styles.modalButtonTextConfirm}>Enviar</Text>
                             </TouchableOpacity>
                         </View>
@@ -521,29 +711,78 @@ export const EventDetailScreen: React.FC = () => {
                 </View>
             </Modal>
 
-            {/* Fixed Bottom Action */}
+            {/* Fixed Bottom Action (Stitch style - two buttons) */}
             {canAttend && (
                 <View style={[styles.bottomAction, { paddingBottom: insets.bottom + spacing.md }]}>
+                    {/* Gradient fade at top */}
+                    <LinearGradient
+                        colors={['transparent', colors.surface]}
+                        style={styles.bottomActionGradient}
+                        pointerEvents="none"
+                    />
                     <View style={styles.bottomActionContent}>
-                        <View style={styles.priceSection}>
-                            <Text style={styles.priceLabel}>Entrada</Text>
-                            <Text style={styles.priceValue}>Gratis</Text>
-                        </View>
-                        <Button
-                            title={event.hasUserRegistered ? 'Cancelar' : 'Asistir'}
-                            variant={event.hasUserRegistered ? 'outline' : 'primary'}
+                        {/* Comments Button (Stitch style) */}
+                        <TouchableOpacity
+                            style={styles.bottomCommentsButton}
+                            onPress={() => navigation.navigate('Comments', {
+                                eventId: event.id,
+                                eventTitle: event.title
+                            })}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="chatbubble-outline" size={20} color={colors.text.primary} />
+                            <Text style={styles.bottomCommentsButtonText}>Comentarios</Text>
+                            {event.commentCount > 0 && (
+                                <View style={styles.commentBadge}>
+                                    <Text style={styles.commentBadgeText}>{event.commentCount}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Registration Button (Stitch style) */}
+                        <TouchableOpacity
+                            style={[
+                                styles.bottomMainButton,
+                                event.hasUserRegistered ? styles.bottomMainButtonCancel : styles.bottomMainButtonPrimary
+                            ]}
                             onPress={handleAttendance}
-                            loading={actionLoading}
-                            style={styles.attendButton}
-                        />
+                            disabled={actionLoading}
+                            activeOpacity={0.8}
+                        >
+                            {actionLoading ? (
+                                <Text style={[
+                                    styles.bottomMainButtonText,
+                                    event.hasUserRegistered && styles.bottomMainButtonTextCancel
+                                ]}>...</Text>
+                            ) : (
+                                <>
+                                    <Ionicons
+                                        name={event.hasUserRegistered ? 'close-circle' : 'ticket'}
+                                        size={20}
+                                        color={event.hasUserRegistered ? colors.error : colors.text.inverse}
+                                    />
+                                    <Text style={[
+                                        styles.bottomMainButtonText,
+                                        event.hasUserRegistered && styles.bottomMainButtonTextCancel
+                                    ]}>
+                                        {event.hasUserRegistered ? 'Cancelar' : 'Inscribirse'}
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
             )}
 
             {isOrganizer && (
                 <View style={[styles.bottomAction, styles.organizerBanner, { paddingBottom: insets.bottom + spacing.md }]}>
-                    <Ionicons name="ribbon" size={20} color={colors.primary} />
-                    <Text style={styles.organizerBannerText}>Eres el organizador de este evento</Text>
+                    <View style={styles.organizerBannerIcon}>
+                        <Ionicons name="ribbon" size={20} color={colors.primary} />
+                    </View>
+                    <View style={styles.organizerBannerContent}>
+                        <Text style={styles.organizerBannerTitle}>Eres el organizador</Text>
+                        <Text style={styles.organizerBannerText}>Gestiona tu evento desde Mis Eventos</Text>
+                    </View>
                 </View>
             )}
         </View>
@@ -657,11 +896,40 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         ...shadows.md,
     },
+    headerButtonBlur: {
+        position: 'absolute',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerButtonBlurInline: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     backButton: {
         left: spacing.md,
     },
-    favoriteButton: {
+    headerRightButtons: {
+        position: 'absolute',
         right: spacing.md,
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    headerButtonInline: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...shadows.md,
     },
     heroContent: {
         position: 'absolute',
@@ -714,6 +982,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    organizerInfo: {
+        flex: 1,
+    },
     organizerLabel: {
         fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
@@ -724,15 +995,93 @@ const styles = StyleSheet.create({
         color: colors.text.primary,
     },
 
+    // Content Section (Stitch style - overlaps hero)
+    contentSection: {
+        backgroundColor: colors.surface,
+        marginTop: -24,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: spacing.lg,
+        paddingHorizontal: spacing.lg,
+    },
+    categoryBadgeContainer: {
+        marginBottom: spacing.sm,
+    },
+    categoryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: colors.primary + '15',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs + 2,
+        borderRadius: borderRadius.full,
+        gap: spacing.xs,
+    },
+    categoryBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: colors.primary,
+        letterSpacing: 0.5,
+    },
+    contentTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: colors.text.primary,
+        marginBottom: spacing.md,
+        letterSpacing: -0.5,
+    },
+
     // Stats Row
     statsRow: {
         flexDirection: 'row',
-        backgroundColor: colors.surface,
-        marginHorizontal: spacing.lg,
-        marginTop: -spacing.xl,
+        backgroundColor: colors.background,
         borderRadius: borderRadius.xl,
         padding: spacing.md,
-        ...shadows.lg,
+        marginBottom: spacing.md,
+    },
+
+    // Attendees Section (Stitch style)
+    attendeesSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+        backgroundColor: colors.surface,
+        gap: spacing.md,
+    },
+    attendeesAvatars: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    attendeeAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: colors.surface,
+    },
+    attendeeAvatarMore: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: colors.surface,
+    },
+    attendeeAvatarMoreText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: colors.text.inverse,
+    },
+    attendeesText: {
+        flex: 1,
+        fontSize: typography.bodySmall.fontSize,
+        color: colors.text.secondary,
     },
     statItem: {
         flex: 1,
@@ -774,6 +1123,45 @@ const styles = StyleSheet.create({
         padding: spacing.md,
         borderRadius: borderRadius.lg,
         ...shadows.sm,
+    },
+    // Location Card with Map (Stitch style)
+    locationCard: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
+        overflow: 'hidden',
+        ...shadows.sm,
+    },
+    locationCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.md,
+    },
+    miniMapContainer: {
+        height: 120,
+        position: 'relative',
+    },
+    miniMap: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    miniMapOverlay: {
+        position: 'absolute',
+        bottom: spacing.sm,
+        right: spacing.sm,
+    },
+    miniMapButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+        gap: spacing.xs,
+        ...shadows.md,
+    },
+    miniMapButtonText: {
+        fontSize: typography.bodySmall.fontSize,
+        fontWeight: '600',
+        color: colors.text.inverse,
     },
     cardIconContainer: {
         width: 52,
@@ -830,37 +1218,53 @@ const styles = StyleSheet.create({
     },
 
     // Action Buttons
-    actionButtonsRow: {
-        flexDirection: 'row',
-        paddingHorizontal: spacing.lg,
-        gap: spacing.md,
+    actionButtonsSection: {
         marginBottom: spacing.md,
     },
+    actionSectionTitle: {
+        fontSize: typography.caption.fontSize,
+        fontWeight: '600',
+        color: colors.text.secondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginLeft: spacing.lg,
+        marginBottom: spacing.sm,
+    },
+    actionButtonsScroll: {
+        paddingHorizontal: spacing.lg,
+        gap: spacing.sm,
+    },
     actionButton: {
-        flex: 1,
         alignItems: 'center',
         backgroundColor: colors.surface,
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
-        ...shadows.sm,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+        borderRadius: borderRadius.xl,
+        minWidth: 90,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    actionButtonHighlight: {
+        borderColor: colors.accent + '40',
+        backgroundColor: colors.accent + '08',
     },
     actionButtonIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: spacing.xs,
     },
     actionButtonText: {
         fontSize: typography.caption.fontSize,
-        fontWeight: '500',
+        fontWeight: '600',
         color: colors.text.primary,
     },
     actionButtonBadge: {
         position: 'absolute',
-        top: spacing.sm,
-        right: spacing.sm,
+        top: spacing.xs,
+        right: spacing.xs,
         backgroundColor: colors.primary,
         paddingHorizontal: spacing.xs,
         paddingVertical: 2,
@@ -915,15 +1319,22 @@ const styles = StyleSheet.create({
         right: 0,
         backgroundColor: colors.surface,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        ...shadows.lg,
+        paddingTop: spacing.lg,
+        borderTopLeftRadius: borderRadius.xxl,
+        borderTopRightRadius: borderRadius.xxl,
+        ...shadows.xl,
+    },
+    bottomActionGradient: {
+        position: 'absolute',
+        top: -24,
+        left: 0,
+        right: 0,
+        height: 24,
     },
     bottomActionContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.lg,
+        gap: spacing.md,
     },
     priceSection: {
         flex: 1,
@@ -931,72 +1342,215 @@ const styles = StyleSheet.create({
     priceLabel: {
         fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
+        marginBottom: 2,
+    },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
     },
     priceValue: {
         fontSize: typography.h3.fontSize,
         fontWeight: '700',
         color: colors.success,
     },
+    freeBadge: {
+        marginLeft: spacing.xs,
+    },
     attendButton: {
         flex: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.md + 2,
+        borderRadius: borderRadius.lg,
+        gap: spacing.sm,
+    },
+    attendButtonPrimary: {
+        backgroundColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    attendButtonCancel: {
+        backgroundColor: colors.error + '10',
+        borderWidth: 1.5,
+        borderColor: colors.error + '30',
+    },
+    attendButtonText: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '700',
+        color: colors.text.inverse,
+    },
+    attendButtonTextCancel: {
+        color: colors.error,
+    },
+    // Stitch style bottom buttons
+    bottomCommentsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+        borderRadius: borderRadius.lg,
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.sm,
+    },
+    bottomCommentsButtonText: {
+        fontSize: typography.bodySmall.fontSize,
+        fontWeight: '600',
+        color: colors.text.primary,
+    },
+    commentBadge: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        minWidth: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    commentBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: colors.text.inverse,
+    },
+    bottomMainButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        gap: spacing.sm,
+    },
+    bottomMainButtonPrimary: {
+        backgroundColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    bottomMainButtonCancel: {
+        backgroundColor: colors.error + '10',
+        borderWidth: 1.5,
+        borderColor: colors.error + '30',
+    },
+    bottomMainButtonText: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '700',
+        color: colors.text.inverse,
+    },
+    bottomMainButtonTextCancel: {
+        color: colors.error,
     },
     organizerBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.sm,
+        gap: spacing.md,
+        backgroundColor: colors.primary + '08',
+        borderWidth: 1,
+        borderColor: colors.primary + '20',
+    },
+    organizerBannerIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    organizerBannerContent: {
+        flex: 1,
+    },
+    organizerBannerTitle: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '700',
+        color: colors.primary,
     },
     organizerBannerText: {
-        fontSize: typography.body.fontSize,
-        color: colors.primary,
-        fontWeight: '500',
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
     },
 
     // Modal
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: spacing.xl,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: colors.surface,
-        borderRadius: borderRadius.xl,
-        padding: spacing.xl,
-        width: '100%',
-        maxWidth: 400,
-        ...shadows.lg,
+        borderTopLeftRadius: borderRadius.xxl,
+        borderTopRightRadius: borderRadius.xxl,
+        paddingHorizontal: spacing.xl,
+        paddingBottom: spacing.xl,
+        paddingTop: spacing.md,
+        ...shadows.xl,
     },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    modalHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: colors.border,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: spacing.lg,
+    },
+    modalIconContainer: {
         alignItems: 'center',
-        marginBottom: spacing.xs,
+        marginBottom: spacing.md,
+    },
+    modalIconCircle: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: colors.warning + '15',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     modalTitle: {
         fontSize: typography.h3.fontSize,
         fontWeight: '700',
         color: colors.text.primary,
+        textAlign: 'center',
     },
     modalSubtitle: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
+        textAlign: 'center',
+        marginTop: spacing.xs,
         marginBottom: spacing.lg,
     },
     modalRatingContainer: {
         alignItems: 'center',
-        paddingVertical: spacing.lg,
+        paddingVertical: spacing.xl,
         backgroundColor: colors.background,
-        borderRadius: borderRadius.lg,
+        borderRadius: borderRadius.xl,
         marginBottom: spacing.lg,
     },
-    ratingLabel: {
+    ratingLabelContainer: {
         marginTop: spacing.md,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+        backgroundColor: 'transparent',
+    },
+    ratingLabelContainerActive: {
+        backgroundColor: colors.warning + '15',
+    },
+    ratingLabel: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
         fontWeight: '500',
+    },
+    ratingLabelActive: {
+        color: colors.warning,
+        fontWeight: '600',
     },
     modalButtons: {
         flexDirection: 'row',
@@ -1004,18 +1558,28 @@ const styles = StyleSheet.create({
     },
     modalButton: {
         flex: 1,
-        paddingVertical: spacing.md,
+        flexDirection: 'row',
+        paddingVertical: spacing.md + 2,
         borderRadius: borderRadius.lg,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     modalButtonCancel: {
         backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     modalButtonConfirm: {
         backgroundColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     modalButtonDisabled: {
         backgroundColor: colors.text.disabled,
+        shadowOpacity: 0,
     },
     modalButtonTextCancel: {
         fontSize: typography.body.fontSize,
