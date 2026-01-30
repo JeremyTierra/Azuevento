@@ -23,7 +23,7 @@ export type ExploreStackParamList = {
 };
 
 export type MapStackParamList = {
-    MapMain: undefined;
+    MapMain: { focusEventId?: number } | undefined;
     EventDetail: { eventId: number };
     Comments: { eventId: number; eventTitle: string };
 };
@@ -207,7 +207,7 @@ export const TabNavigator = () => {
             <Tab.Screen
                 name="MyEvents"
                 component={MyEventsNavigator}
-                options={{ tabBarLabel: 'Mis Eventos' }}
+                options={{ tabBarLabel: 'Agenda' }}
             />
             <Tab.Screen
                 name="Map"

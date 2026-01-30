@@ -222,10 +222,15 @@ export const CreateEventScreen: React.FC = () => {
 
         setLoading(true);
         try {
+            // If no end date specified, default to start date + 2 hours
+            const effectiveEndDate = hasEndDate && endDate
+                ? endDate
+                : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
             const eventData: EventRequest = {
                 ...formData,
                 startDate: formatForAPI(startDate),
-                endDate: hasEndDate && endDate ? formatForAPI(endDate) : '',
+                endDate: formatForAPI(effectiveEndDate),
             };
 
             const event = await eventService.create(eventData);
@@ -287,15 +292,23 @@ export const CreateEventScreen: React.FC = () => {
 
     const handleConfirmLocation = () => {
         if (tempCoordinates) {
-            updateField('latitude', tempCoordinates.latitude);
-            updateField('longitude', tempCoordinates.longitude);
+            // Update both coordinates at once to avoid state overwrite
+            setFormData(prev => ({
+                ...prev,
+                latitude: tempCoordinates.latitude,
+                longitude: tempCoordinates.longitude,
+            }));
         }
         setShowMapModal(false);
     };
 
     const handleClearLocation = () => {
-        updateField('latitude', undefined);
-        updateField('longitude', undefined);
+        // Clear both coordinates at once
+        setFormData(prev => ({
+            ...prev,
+            latitude: undefined,
+            longitude: undefined,
+        }));
         setTempCoordinates(null);
     };
 
