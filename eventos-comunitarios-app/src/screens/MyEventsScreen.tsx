@@ -6,45 +6,86 @@ import {
     StyleSheet,
     TouchableOpacity,
     Alert,
+    RefreshControl,
+    ActivityIndicator,
+    ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/AppNavigator';
+import type { MyEventsStackParamList } from '../navigation/TabNavigator';
 import { eventService } from '../services/eventService';
+import { favoriteService } from '../services/favoriteService';
 import { EventCard } from '../components/EventCard';
 import { Button } from '../components/Button';
-import { Loading } from '../components/Loading';
 import type { Event } from '../types/models';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing, typography, borderRadius } from '../theme';
 
-type MyEventsNavigationProp = NativeStackNavigationProp<MainStackParamList, 'MyEvents'>;
+type MyEventsNavigationProp = NativeStackNavigationProp<MyEventsStackParamList, 'MyEventsList'>;
 
-type Tab = 'organized' | 'attending';
+type Tab = 'favorites' | 'organized' | 'attending';
 
 export const MyEventsScreen: React.FC = () => {
     const navigation = useNavigation<MyEventsNavigationProp>();
-    const [activeTab, setActiveTab] = useState<Tab>('organized');
-    const [events, setEvents] = useState<Event[]>([]);
+    const insets = useSafeAreaInsets();
+
+    // State
+    const [activeTab, setActiveTab] = useState<Tab>('favorites');
+    const [allOrganized, setAllOrganized] = useState<Event[]>([]);
+    const [allFavorites, setAllFavorites] = useState<Event[]>([]);
+    const [allAttending, setAllAttending] = useState<Event[]>([]);
+    const [displayedEvents, setDisplayedEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
-            loadEvents();
-        }, [activeTab])
+            loadAllEvents();
+        }, [])
     );
 
-    const loadEvents = async () => {
-        setLoading(true);
+    useEffect(() => {
+        filterEventsByTab();
+    }, [activeTab, allOrganized, allFavorites, allAttending]);
+
+    const loadAllEvents = async () => {
         try {
-            const data = await eventService.getMyEvents();
-            setEvents(data);
+            const [organized, favorites] = await Promise.all([
+                eventService.getMyEvents(),
+                favoriteService.getUserFavorites(),
+            ]);
+
+            setAllOrganized(organized);
+            setAllFavorites(favorites);
+            // TODO: Cuando tengamos el endpoint de eventos asistiendo, cargarlo aquí
+            setAllAttending([]);
         } catch (error: any) {
+            console.error('Error loading events:', error);
             Alert.alert('Error', error.message || 'No se pudieron cargar los eventos');
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const filterEventsByTab = useCallback(() => {
+        let result: Event[] = [];
+
+        if (activeTab === 'favorites') {
+            result = allFavorites;
+        } else if (activeTab === 'organized') {
+            result = allOrganized;
+        } else if (activeTab === 'attending') {
+            result = allAttending;
+        }
+
+        setDisplayedEvents(result);
+    }, [activeTab, allOrganized, allFavorites, allAttending]);
+
+    const handleRefresh = () => {
+        setRefreshing(true);
+        loadAllEvents();
     };
 
     const handleEventPress = (event: Event) => {
@@ -55,7 +96,7 @@ export const MyEventsScreen: React.FC = () => {
         try {
             await eventService.publish(eventId);
             Alert.alert('Éxito', 'Evento publicado correctamente');
-            loadEvents();
+            loadAllEvents();
         } catch (error: any) {
             Alert.alert('Error', error.message || 'No se pudo publicar el evento');
         }
@@ -74,7 +115,7 @@ export const MyEventsScreen: React.FC = () => {
                         try {
                             await eventService.cancel(eventId);
                             Alert.alert('Éxito', 'Evento cancelado');
-                            loadEvents();
+                            loadAllEvents();
                         } catch (error: any) {
                             Alert.alert('Error', error.message || 'No se pudo cancelar el evento');
                         }
@@ -91,95 +132,166 @@ export const MyEventsScreen: React.FC = () => {
             {activeTab === 'organized' && item.status === 'DRAFT' && (
                 <View style={styles.actions}>
                     <Button
-                        title="Publicar"
-                        variant="primary"
+                        title="Publicar Evento"
                         onPress={() => handlePublish(item.id)}
-                        style={styles.actionButton}
+                        variant="secondary"
                     />
                 </View>
             )}
 
             {activeTab === 'organized' && item.status === 'PUBLISHED' && (
                 <View style={styles.actions}>
-                    <Button
-                        title="Cancelar"
-                        variant="danger"
+                    <TouchableOpacity
+                        style={styles.cancelButton}
                         onPress={() => handleCancel(item.id)}
-                        style={styles.actionButton}
-                    />
+                    >
+                        <Ionicons name="close-circle-outline" size={20} color={colors.error} />
+                        <Text style={styles.cancelText}>Cancelar Evento</Text>
+                    </TouchableOpacity>
                 </View>
             )}
         </View>
     );
 
-    const renderEmptyState = () => (
-        <View style={styles.emptyState}>
-            <Ionicons
-                name={activeTab === 'organized' ? 'create-outline' : 'ticket-outline'}
-                size={64}
-                color={colors.text.disabled}
-            />
-            <Text style={styles.emptyTitle}>
-                {activeTab === 'organized' ? 'No has creado eventos' : 'No estás asistiendo a eventos'}
-            </Text>
-            {activeTab === 'organized' && (
-                <Button
-                    title="Crear mi primer evento"
-                    onPress={() => navigation.navigate('CreateEvent')}
-                    style={styles.createButton}
-                />
-            )}
-        </View>
-    );
+    const renderEmpty = () => {
+        let icon: keyof typeof Ionicons.glyphMap = 'heart-outline';
+        let title = '';
+        let text = '';
+        let showCreateButton = false;
 
-    const organizedEvents = events.filter(e => e.isOrganizer);
-    const attendingEvents = events.filter(e => e.hasUserRegistered && !e.isOrganizer);
-    const displayEvents = activeTab === 'organized' ? organizedEvents : attendingEvents;
+        if (activeTab === 'favorites') {
+            icon = 'heart-outline';
+            title = 'No tienes favoritos';
+            text = 'Los eventos que marques como favoritos aparecerán aquí';
+        } else if (activeTab === 'organized') {
+            icon = 'calendar-outline';
+            title = 'No has creado eventos';
+            text = 'Crea tu primer evento y compártelo con la comunidad';
+            showCreateButton = true;
+        } else {
+            icon = 'people-outline';
+            title = 'No estás asistiendo a eventos';
+            text = 'Explora eventos y marca tu asistencia';
+        }
+
+        return (
+            <View style={styles.emptyState}>
+                <Ionicons name={icon} size={56} color={colors.text.disabled} />
+                <Text style={styles.emptyTitle}>{title}</Text>
+                <Text style={styles.emptyText}>{text}</Text>
+                {showCreateButton && (
+                    <Button
+                        title="Crear Evento"
+                        onPress={() => navigation.navigate('CreateEvent')}
+                        style={{ marginTop: spacing.lg }}
+                    />
+                )}
+            </View>
+        );
+    };
 
     if (loading) {
-        return <Loading message="Cargando tus eventos..." />;
+        return (
+            <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
                 <Text style={styles.headerTitle}>Mis Eventos</Text>
+
+                {/* Category-style Tabs */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tabsContainer}
+                >
+                    <TouchableOpacity
+                        style={[
+                            styles.tabChip,
+                            activeTab === 'favorites' && styles.tabChipSelected
+                        ]}
+                        onPress={() => setActiveTab('favorites')}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons
+                            name="heart"
+                            size={16}
+                            color={activeTab === 'favorites' ? colors.text.inverse : colors.text.secondary}
+                        />
+                        <Text style={[
+                            styles.tabChipText,
+                            activeTab === 'favorites' && styles.tabChipTextSelected
+                        ]}>
+                            Favoritos
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.tabChip,
+                            activeTab === 'organized' && styles.tabChipSelected
+                        ]}
+                        onPress={() => setActiveTab('organized')}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons
+                            name="calendar"
+                            size={16}
+                            color={activeTab === 'organized' ? colors.text.inverse : colors.text.secondary}
+                        />
+                        <Text style={[
+                            styles.tabChipText,
+                            activeTab === 'organized' && styles.tabChipTextSelected
+                        ]}>
+                            Organizados
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.tabChip,
+                            activeTab === 'attending' && styles.tabChipSelected
+                        ]}
+                        onPress={() => setActiveTab('attending')}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons
+                            name="people"
+                            size={16}
+                            color={activeTab === 'attending' ? colors.text.inverse : colors.text.secondary}
+                        />
+                        <Text style={[
+                            styles.tabChipText,
+                            activeTab === 'attending' && styles.tabChipTextSelected
+                        ]}>
+                            Asistiendo
+                        </Text>
+                    </TouchableOpacity>
+                </ScrollView>
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabs}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'organized' && styles.tabActive]}
-                    onPress={() => setActiveTab('organized')}
-                >
-                    <Text
-                        style={[styles.tabText, activeTab === 'organized' && styles.tabTextActive]}
-                    >
-                        Organizados ({organizedEvents.length})
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'attending' && styles.tabActive]}
-                    onPress={() => setActiveTab('attending')}
-                >
-                    <Text
-                        style={[styles.tabText, activeTab === 'attending' && styles.tabTextActive]}
-                    >
-                        Asistiendo ({attendingEvents.length})
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* List */}
+            {/* Event List */}
             <FlatList
-                data={displayEvents}
+                data={displayedEvents}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={renderEventItem}
-                ListEmptyComponent={renderEmptyState}
+                ListEmptyComponent={renderEmpty}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={colors.primary}
+                        colors={[colors.primary]}
+                    />
+                }
             />
-        </SafeAreaView>
+        </View>
     );
 };
 
@@ -188,66 +300,92 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.background,
+    },
     header: {
+        backgroundColor: colors.surface,
         paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
+        paddingBottom: spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
     },
     headerTitle: {
         fontSize: typography.h2.fontSize,
         fontWeight: typography.h2.fontWeight,
         color: colors.text.primary,
+        marginBottom: spacing.md,
     },
-    tabs: {
+    tabsContainer: {
+        gap: spacing.sm,
+        paddingBottom: spacing.xs,
+    },
+    tabChip: {
         flexDirection: 'row',
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-    },
-    tab: {
-        flex: 1,
-        paddingVertical: spacing.md,
         alignItems: 'center',
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.xs,
     },
-    tabActive: {
-        borderBottomColor: colors.primary,
+    tabChipSelected: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
-    tabText: {
-        fontSize: typography.body.fontSize,
+    tabChipText: {
+        fontSize: typography.bodySmall.fontSize,
+        fontWeight: '600',
         color: colors.text.secondary,
     },
-    tabTextActive: {
-        fontWeight: '600',
-        color: colors.primary,
+    tabChipTextSelected: {
+        color: colors.text.inverse,
     },
     listContent: {
-        padding: spacing.md,
+        padding: spacing.lg,
+        flexGrow: 1,
     },
     actions: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-        marginTop: -spacing.md,
-        marginBottom: spacing.md,
         paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.md,
     },
-    actionButton: {
-        flex: 1,
-    },
-    emptyState: {
+    cancelButton: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: spacing.xxl,
-        gap: spacing.md,
+        paddingVertical: spacing.sm,
+        gap: spacing.xs,
+    },
+    cancelText: {
+        fontSize: typography.body.fontSize,
+        color: colors.error,
+        fontWeight: '600',
+    },
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.xxl * 2,
+        paddingHorizontal: spacing.xl,
     },
     emptyTitle: {
-        fontSize: typography.h4.fontSize,
-        fontWeight: typography.h4.fontWeight,
+        fontSize: typography.h3.fontSize,
+        fontWeight: '600',
         color: colors.text.primary,
-        marginBottom: spacing.lg,
+        marginTop: spacing.md,
         textAlign: 'center',
     },
-    createButton: {
-        marginTop: spacing.md,
+    emptyText: {
+        fontSize: typography.body.fontSize,
+        color: colors.text.secondary,
+        textAlign: 'center',
+        marginTop: spacing.xs,
+        lineHeight: 22,
     },
 });

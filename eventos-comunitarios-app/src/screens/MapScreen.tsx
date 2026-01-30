@@ -1,6 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity, Linking, Platform, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    Alert,
+    TouchableOpacity,
+    Linking,
+    Platform,
+    ActivityIndicator,
+    ScrollView,
+    TextInput,
+    Keyboard,
+    Image,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Callout, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -8,12 +21,19 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MapStackParamList } from '../navigation/TabNavigator';
 import * as Location from 'expo-location';
 import { eventService } from '../services/eventService';
-import { Loading } from '../components/Loading';
+import {
+    routingService,
+    TRANSPORT_MODES,
+    formatRouteDistance,
+    formatRouteDuration,
+    type TransportMode,
+    type RouteInfo,
+    type Coordinate,
+} from '../services/routingService';
 import type { Event } from '../types/models';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import { formatDate, formatTime, getCategoryIcon } from '../utils/formatters';
 
-// Default location: Cuenca, Ecuador
 const DEFAULT_REGION = {
     latitude: -2.9001,
     longitude: -79.0059,
@@ -23,41 +43,36 @@ const DEFAULT_REGION = {
 
 type MapScreenNavigationProp = NativeStackNavigationProp<MapStackParamList, 'MapMain'>;
 
-type UserLocation = {
-    latitude: number;
-    longitude: number;
-};
-
-// Calculate distance between two coordinates in km
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-};
-
-// Format distance for display
-const formatDistance = (km: number): string => {
-    if (km < 1) {
-        return `${Math.round(km * 1000)} m`;
-    }
-    return `${km.toFixed(1)} km`;
-};
-
 export const MapScreen: React.FC = () => {
     const navigation = useNavigation<MapScreenNavigationProp>();
+    const insets = useSafeAreaInsets();
     const mapRef = useRef<MapView>(null);
+
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+    const [userLocation, setUserLocation] = useState<Coordinate | null>(null);
     const [showDirections, setShowDirections] = useState(false);
     const [loadingLocation, setLoadingLocation] = useState(false);
+    const [transportMode, setTransportMode] = useState<TransportMode>('driving-car');
+    const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+    const [routeCoordinates, setRouteCoordinates] = useState<Coordinate[]>([]);
+
+    // Search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+
+    // Filtered events based on search
+    const filteredEvents = useMemo(() => {
+        if (!searchQuery.trim()) return events;
+        const query = searchQuery.toLowerCase();
+        return events.filter(event =>
+            event.title.toLowerCase().includes(query) ||
+            event.location.toLowerCase().includes(query) ||
+            event.categoryName.toLowerCase().includes(query)
+        );
+    }, [events, searchQuery]);
 
     useEffect(() => {
         loadEvents();
@@ -88,7 +103,6 @@ export const MapScreen: React.FC = () => {
             setEvents(eventsWithLocation);
         } catch (error: any) {
             console.error('Error loading events:', error);
-            Alert.alert('Error', 'No se pudieron cargar los eventos');
         } finally {
             setLoading(false);
         }
@@ -97,30 +111,41 @@ export const MapScreen: React.FC = () => {
     const handleMarkerPress = (event: Event) => {
         setSelectedEvent(event);
         setShowDirections(false);
+        setShowSearchResults(false);
+        Keyboard.dismiss();
+
+        // Center map on selected event
+        if (mapRef.current && event.latitude && event.longitude) {
+            mapRef.current.animateToRegion({
+                latitude: event.latitude,
+                longitude: event.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            }, 300);
+        }
     };
 
     const handleEventPress = (eventId: number) => {
         navigation.navigate('EventDetail', { eventId });
     };
 
-    const handleGetDirections = async (event: Event) => {
+    const handleGetDirections = async (event: Event, mode: TransportMode = transportMode) => {
         if (!event.latitude || !event.longitude) {
-            Alert.alert('Error', 'Este evento no tiene coordenadas disponibles');
+            Alert.alert('Error', 'Este evento no tiene coordenadas');
             return;
         }
 
         setLoadingLocation(true);
 
         try {
-            // Get current location
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 Alert.alert(
                     'Permiso requerido',
-                    'Necesitamos acceso a tu ubicación para mostrarte las direcciones',
+                    'Necesitamos tu ubicación para las direcciones',
                     [
                         { text: 'Cancelar', style: 'cancel' },
-                        { text: 'Abrir en Maps', onPress: () => openExternalMaps(event) }
+                        { text: 'Abrir Maps', onPress: () => openExternalMaps(event) }
                     ]
                 );
                 setLoadingLocation(false);
@@ -128,38 +153,92 @@ export const MapScreen: React.FC = () => {
             }
 
             const location = await Location.getCurrentPositionAsync({});
-            const newUserLocation = {
+            const newUserLocation: Coordinate = {
                 latitude: location.coords.latitude,
                 longitude: location.coords.longitude,
             };
             setUserLocation(newUserLocation);
-            setShowDirections(true);
 
-            // Fit map to show both points
-            if (mapRef.current) {
-                mapRef.current.fitToCoordinates(
-                    [
-                        newUserLocation,
-                        { latitude: event.latitude, longitude: event.longitude }
-                    ],
-                    {
-                        edgePadding: { top: 100, right: 50, bottom: 250, left: 50 },
+            const destination: Coordinate = {
+                latitude: event.latitude,
+                longitude: event.longitude,
+            };
+
+            if (!routingService.isConfigured()) {
+                setRouteCoordinates([newUserLocation, destination]);
+                setRouteInfo(null);
+                setShowDirections(true);
+
+                if (mapRef.current) {
+                    mapRef.current.fitToCoordinates([newUserLocation, destination], {
+                        edgePadding: { top: 120, right: 50, bottom: 300, left: 50 },
                         animated: true,
-                    }
-                );
+                    });
+                }
+                return;
+            }
+
+            try {
+                const route = await routingService.getRoute(newUserLocation, destination, mode);
+                setRouteInfo(route);
+                setRouteCoordinates(route.coordinates);
+                setShowDirections(true);
+
+                if (mapRef.current && route.coordinates.length > 0) {
+                    mapRef.current.fitToCoordinates(route.coordinates, {
+                        edgePadding: { top: 120, right: 50, bottom: 350, left: 50 },
+                        animated: true,
+                    });
+                }
+            } catch (routeError: any) {
+                setRouteCoordinates([newUserLocation, destination]);
+                setRouteInfo(null);
+                setShowDirections(true);
+
+                if (mapRef.current) {
+                    mapRef.current.fitToCoordinates([newUserLocation, destination], {
+                        edgePadding: { top: 120, right: 50, bottom: 300, left: 50 },
+                        animated: true,
+                    });
+                }
             }
         } catch (error) {
-            console.error('Error getting location:', error);
-            Alert.alert(
-                'Error',
-                'No se pudo obtener tu ubicación',
-                [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Abrir en Maps', onPress: () => openExternalMaps(event) }
-                ]
-            );
+            Alert.alert('Error', 'No se pudo obtener tu ubicación', [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Abrir Maps', onPress: () => openExternalMaps(event) }
+            ]);
         } finally {
             setLoadingLocation(false);
+        }
+    };
+
+    const handleTransportModeChange = async (mode: TransportMode) => {
+        setTransportMode(mode);
+        if (showDirections && selectedEvent && userLocation) {
+            setLoadingLocation(true);
+            try {
+                const destination: Coordinate = {
+                    latitude: selectedEvent.latitude!,
+                    longitude: selectedEvent.longitude!,
+                };
+
+                if (routingService.isConfigured()) {
+                    const route = await routingService.getRoute(userLocation, destination, mode);
+                    setRouteInfo(route);
+                    setRouteCoordinates(route.coordinates);
+
+                    if (mapRef.current && route.coordinates.length > 0) {
+                        mapRef.current.fitToCoordinates(route.coordinates, {
+                            edgePadding: { top: 120, right: 50, bottom: 350, left: 50 },
+                            animated: true,
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error changing transport mode:', error);
+            } finally {
+                setLoadingLocation(false);
+            }
         }
     };
 
@@ -179,16 +258,8 @@ export const MapScreen: React.FC = () => {
 
         if (url) {
             Linking.canOpenURL(url)
-                .then((supported) => {
-                    if (supported) {
-                        return Linking.openURL(url);
-                    } else {
-                        return Linking.openURL(googleMapsUrl);
-                    }
-                })
-                .catch(() => {
-                    Linking.openURL(googleMapsUrl);
-                });
+                .then((supported) => supported ? Linking.openURL(url) : Linking.openURL(googleMapsUrl))
+                .catch(() => Linking.openURL(googleMapsUrl));
         } else {
             Linking.openURL(googleMapsUrl);
         }
@@ -196,282 +267,460 @@ export const MapScreen: React.FC = () => {
 
     const closeDirections = () => {
         setShowDirections(false);
+        setRouteInfo(null);
+        setRouteCoordinates([]);
         centerOnEvents();
     };
 
     const centerOnEvents = () => {
-        if (events.length > 0 && mapRef.current) {
-            const coordinates = events.map((e) => ({
+        if (filteredEvents.length > 0 && mapRef.current) {
+            const coordinates = filteredEvents.map((e) => ({
                 latitude: e.latitude!,
                 longitude: e.longitude!,
             }));
             mapRef.current.fitToCoordinates(coordinates, {
-                edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
+                edgePadding: { top: 120, right: 50, bottom: 100, left: 50 },
                 animated: true,
             });
         }
     };
 
-    const getDistance = (): string | null => {
-        if (!userLocation || !selectedEvent?.latitude || !selectedEvent?.longitude) {
-            return null;
+    const centerOnUser = async () => {
+        if (userLocation && mapRef.current) {
+            mapRef.current.animateToRegion({
+                ...userLocation,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+            }, 300);
+        } else {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+                const location = await Location.getCurrentPositionAsync({});
+                const newLocation = {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                };
+                setUserLocation(newLocation);
+                mapRef.current?.animateToRegion({
+                    ...newLocation,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
+                }, 300);
+            }
         }
-        const distance = calculateDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            selectedEvent.latitude,
-            selectedEvent.longitude
-        );
-        return formatDistance(distance);
+    };
+
+    const clearSearch = () => {
+        setSearchQuery('');
+        setShowSearchResults(false);
+        Keyboard.dismiss();
+    };
+
+    const handleSearchResultPress = (event: Event) => {
+        setSelectedEvent(event);
+        setShowSearchResults(false);
+        setSearchQuery('');
+        Keyboard.dismiss();
+
+        // Center map on selected event
+        if (mapRef.current && event.latitude && event.longitude) {
+            mapRef.current.animateToRegion({
+                latitude: event.latitude,
+                longitude: event.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            }, 300);
+        }
+    };
+
+    const handleSearchChange = (text: string) => {
+        setSearchQuery(text);
+        setShowSearchResults(text.trim().length > 0);
     };
 
     if (loading) {
-        return <Loading message="Cargando mapa..." />;
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>
-                    {showDirections ? 'Direcciones' : 'Mapa de Eventos'}
-                </Text>
-                <Text style={styles.headerSubtitle}>
-                    {showDirections
-                        ? `Ruta hacia ${selectedEvent?.title}`
-                        : `${events.length} ${events.length === 1 ? 'evento' : 'eventos'} en el mapa`
-                    }
-                </Text>
-            </View>
-
-            {events.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Ionicons name="location-outline" size={64} color={colors.text.disabled} />
-                    <Text style={styles.emptyTitle}>Sin eventos en el mapa</Text>
-                    <Text style={styles.emptyText}>
-                        No hay eventos con ubicación disponible
-                    </Text>
-                </View>
-            ) : (
-                <View style={styles.mapContainer}>
-                    <MapView
-                        ref={mapRef}
-                        style={styles.map}
-                        initialRegion={DEFAULT_REGION}
-                        showsUserLocation
-                        showsMyLocationButton={false}
+        <View style={styles.container}>
+            {/* Map */}
+            <MapView
+                ref={mapRef}
+                style={styles.map}
+                initialRegion={DEFAULT_REGION}
+                showsUserLocation
+                showsMyLocationButton={false}
+                onPress={() => {
+                    if (!showDirections) setSelectedEvent(null);
+                    setShowSearchResults(false);
+                    Keyboard.dismiss();
+                }}
+            >
+                {filteredEvents.map((event) => (
+                    <Marker
+                        key={event.id}
+                        coordinate={{
+                            latitude: event.latitude!,
+                            longitude: event.longitude!,
+                        }}
+                        onPress={() => handleMarkerPress(event)}
                     >
-                        {/* Event markers */}
-                        {events.map((event) => (
-                            <Marker
-                                key={event.id}
-                                coordinate={{
-                                    latitude: event.latitude!,
-                                    longitude: event.longitude!,
-                                }}
-                                onPress={() => handleMarkerPress(event)}
-                            >
-                                <View style={styles.markerContainer}>
-                                    <View style={[
-                                        styles.marker,
-                                        selectedEvent?.id === event.id && showDirections && styles.markerSelected
-                                    ]}>
-                                        <Ionicons
-                                            name={getCategoryIcon(event.categoryName) as any}
-                                            size={20}
-                                            color={colors.text.inverse}
-                                        />
-                                    </View>
-                                    <View style={[
-                                        styles.markerTail,
-                                        selectedEvent?.id === event.id && showDirections && styles.markerTailSelected
-                                    ]} />
-                                </View>
-                                <Callout
-                                    tooltip
-                                    onPress={() => handleEventPress(event.id)}
-                                >
-                                    <View style={styles.callout}>
-                                        <Text style={styles.calloutTitle} numberOfLines={2}>
-                                            {event.title}
-                                        </Text>
-                                        <View style={styles.calloutInfo}>
-                                            <Ionicons
-                                                name="calendar-outline"
-                                                size={14}
-                                                color={colors.primary}
-                                            />
-                                            <Text style={styles.calloutDate}>
-                                                {formatDate(event.startDate, 'EEE, d MMM')}
-                                            </Text>
-                                        </View>
-                                        <Text style={styles.calloutCta}>Toca para ver más</Text>
-                                    </View>
-                                </Callout>
-                            </Marker>
-                        ))}
+                        <View style={styles.markerContainer}>
+                            <View style={[
+                                styles.marker,
+                                selectedEvent?.id === event.id && styles.markerSelected
+                            ]}>
+                                <Ionicons
+                                    name={getCategoryIcon(event.categoryName) as any}
+                                    size={18}
+                                    color={colors.text.inverse}
+                                />
+                            </View>
+                        </View>
+                    </Marker>
+                ))}
 
-                        {/* Direction line */}
-                        {showDirections && userLocation && selectedEvent?.latitude && selectedEvent?.longitude && (
-                            <Polyline
-                                coordinates={[
-                                    userLocation,
-                                    { latitude: selectedEvent.latitude, longitude: selectedEvent.longitude }
-                                ]}
-                                strokeColor={colors.primary}
-                                strokeWidth={4}
-                                lineDashPattern={[10, 5]}
-                            />
-                        )}
-                    </MapView>
+                {showDirections && routeCoordinates.length > 0 && (
+                    <Polyline
+                        coordinates={routeCoordinates}
+                        strokeColor={colors.primary}
+                        strokeWidth={4}
+                        lineCap="round"
+                        lineJoin="round"
+                    />
+                )}
+            </MapView>
 
-                    {/* Map buttons */}
-                    {!showDirections && (
-                        <>
-                            <TouchableOpacity
-                                style={styles.centerButton}
-                                onPress={centerOnEvents}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="locate" size={24} color={colors.primary} />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.refreshButton}
-                                onPress={loadEvents}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="refresh" size={24} color={colors.primary} />
-                            </TouchableOpacity>
-                        </>
-                    )}
-
-                    {/* Close directions button */}
-                    {showDirections && (
-                        <TouchableOpacity
-                            style={styles.closeDirectionsButton}
-                            onPress={closeDirections}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="close" size={24} color={colors.text.primary} />
+            {/* Search Bar */}
+            <View style={[styles.searchContainer, { top: insets.top + spacing.sm }]}>
+                <View style={[styles.searchBar, isSearchFocused && styles.searchBarFocused]}>
+                    <Ionicons
+                        name="search"
+                        size={20}
+                        color={isSearchFocused ? colors.primary : colors.text.secondary}
+                    />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Buscar eventos en el mapa..."
+                        placeholderTextColor={colors.text.disabled}
+                        value={searchQuery}
+                        onChangeText={handleSearchChange}
+                        onFocus={() => {
+                            setIsSearchFocused(true);
+                            if (searchQuery.trim()) setShowSearchResults(true);
+                        }}
+                        onBlur={() => setIsSearchFocused(false)}
+                        returnKeyType="search"
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={clearSearch}>
+                            <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
                         </TouchableOpacity>
                     )}
+                </View>
+
+                {/* Search Results Dropdown */}
+                {showSearchResults && searchQuery.trim() && (
+                    <View style={styles.searchResultsDropdown}>
+                        {/* Results header */}
+                        <View style={styles.searchResultsHeader}>
+                            <Text style={styles.searchResultsCount}>
+                                {filteredEvents.length} {filteredEvents.length === 1 ? 'resultado' : 'resultados'}
+                            </Text>
+                            <TouchableOpacity onPress={() => setShowSearchResults(false)}>
+                                <Ionicons name="chevron-up" size={20} color={colors.text.secondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Results list */}
+                        {filteredEvents.length > 0 ? (
+                            <ScrollView
+                                style={styles.searchResultsList}
+                                keyboardShouldPersistTaps="handled"
+                                showsVerticalScrollIndicator={true}
+                            >
+                                {filteredEvents.slice(0, 5).map((event) => (
+                                    <TouchableOpacity
+                                        key={event.id}
+                                        style={styles.searchResultItem}
+                                        onPress={() => handleSearchResultPress(event)}
+                                        activeOpacity={0.7}
+                                    >
+                                        {/* Event thumbnail or icon */}
+                                        {event.coverImage ? (
+                                            <Image
+                                                source={{ uri: event.coverImage }}
+                                                style={styles.searchResultImage}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <View style={styles.searchResultIconContainer}>
+                                                <Ionicons
+                                                    name={getCategoryIcon(event.categoryName) as any}
+                                                    size={18}
+                                                    color={colors.primary}
+                                                />
+                                            </View>
+                                        )}
+
+                                        {/* Event info */}
+                                        <View style={styles.searchResultInfo}>
+                                            <Text style={styles.searchResultTitle} numberOfLines={1}>
+                                                {event.title}
+                                            </Text>
+                                            <View style={styles.searchResultMeta}>
+                                                <Ionicons name="location-outline" size={12} color={colors.text.disabled} />
+                                                <Text style={styles.searchResultLocation} numberOfLines={1}>
+                                                    {event.location}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Arrow */}
+                                        <Ionicons name="chevron-forward" size={18} color={colors.text.disabled} />
+                                    </TouchableOpacity>
+                                ))}
+
+                                {/* Show more indicator */}
+                                {filteredEvents.length > 5 && (
+                                    <View style={styles.moreResultsHint}>
+                                        <Text style={styles.moreResultsText}>
+                                            +{filteredEvents.length - 5} más
+                                        </Text>
+                                    </View>
+                                )}
+                            </ScrollView>
+                        ) : (
+                            <View style={styles.noResultsContainer}>
+                                <Ionicons name="search-outline" size={24} color={colors.text.disabled} />
+                                <Text style={styles.noResultsText}>Sin resultados</Text>
+                            </View>
+                        )}
+                    </View>
+                )}
+            </View>
+
+            {/* Map Controls */}
+            {!showDirections && (
+                <View style={[styles.mapControls, { top: insets.top + 80 }]}>
+                    <TouchableOpacity
+                        style={styles.mapButton}
+                        onPress={centerOnUser}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="locate" size={22} color={colors.primary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.mapButton}
+                        onPress={centerOnEvents}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="apps" size={22} color={colors.primary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.mapButton}
+                        onPress={loadEvents}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="refresh" size={22} color={colors.primary} />
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Close Directions Button */}
+            {showDirections && (
+                <TouchableOpacity
+                    style={[styles.closeButton, { top: insets.top + 80 }]}
+                    onPress={closeDirections}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="close" size={24} color={colors.text.primary} />
+                </TouchableOpacity>
+            )}
+
+            {/* Empty State */}
+            {filteredEvents.length === 0 && !loading && (
+                <View style={styles.emptyState}>
+                    <Ionicons name="location-outline" size={48} color={colors.text.disabled} />
+                    <Text style={styles.emptyText}>
+                        {searchQuery ? 'Sin resultados' : 'No hay eventos con ubicación'}
+                    </Text>
                 </View>
             )}
 
             {/* Directions Card */}
             {showDirections && selectedEvent && (
-                <View style={styles.directionsCard}>
-                    <View style={styles.directionsCardContent}>
-                        <View style={styles.directionsHeader}>
-                            <View style={styles.directionsIconContainer}>
-                                <Ionicons name="navigate" size={24} color={colors.primary} />
+                <View style={[styles.bottomCard, { paddingBottom: insets.bottom + spacing.md }]}>
+                    {/* Transport Modes */}
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.transportScroll}
+                        contentContainerStyle={styles.transportContainer}
+                    >
+                        {TRANSPORT_MODES.map((mode) => (
+                            <TouchableOpacity
+                                key={mode.id}
+                                style={[
+                                    styles.transportChip,
+                                    transportMode === mode.id && styles.transportChipActive,
+                                ]}
+                                onPress={() => handleTransportModeChange(mode.id)}
+                                disabled={loadingLocation}
+                            >
+                                <Ionicons
+                                    name={mode.icon as any}
+                                    size={18}
+                                    color={transportMode === mode.id ? colors.text.inverse : colors.text.secondary}
+                                />
+                                <Text style={[
+                                    styles.transportChipText,
+                                    transportMode === mode.id && styles.transportChipTextActive,
+                                ]}>
+                                    {mode.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
+                    {/* Route Info */}
+                    {routeInfo && (
+                        <View style={styles.routeInfo}>
+                            <View style={styles.routeInfoItem}>
+                                <Text style={styles.routeInfoValue}>{formatRouteDuration(routeInfo.duration)}</Text>
+                                <Text style={styles.routeInfoLabel}>tiempo</Text>
                             </View>
-                            <View style={styles.directionsInfo}>
-                                <Text style={styles.directionsTitle} numberOfLines={1}>
-                                    {selectedEvent.title}
-                                </Text>
-                                <Text style={styles.directionsSubtitle}>
-                                    {selectedEvent.location}
-                                </Text>
+                            <View style={styles.routeInfoDivider} />
+                            <View style={styles.routeInfoItem}>
+                                <Text style={styles.routeInfoValue}>{formatRouteDistance(routeInfo.distance)}</Text>
+                                <Text style={styles.routeInfoLabel}>distancia</Text>
                             </View>
                         </View>
+                    )}
 
-                        {getDistance() && (
-                            <View style={styles.distanceContainer}>
-                                <Ionicons name="walk-outline" size={20} color={colors.text.secondary} />
-                                <Text style={styles.distanceText}>
-                                    Distancia aproximada: <Text style={styles.distanceBold}>{getDistance()}</Text>
-                                </Text>
+                    {loadingLocation && (
+                        <View style={styles.loadingRoute}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={styles.loadingRouteText}>Calculando...</Text>
+                        </View>
+                    )}
+
+                    {/* Destination */}
+                    <View style={styles.destination}>
+                        <View style={styles.destinationIcon}>
+                            <Ionicons name="location" size={18} color={colors.primary} />
+                        </View>
+                        <View style={styles.destinationText}>
+                            <Text style={styles.destinationTitle} numberOfLines={1}>{selectedEvent.title}</Text>
+                            <Text style={styles.destinationSubtitle} numberOfLines={1}>{selectedEvent.location}</Text>
+                        </View>
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.actions}>
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() => openExternalMaps(selectedEvent)}
+                        >
+                            <Ionicons name="navigate" size={18} color={colors.text.inverse} />
+                            <Text style={styles.primaryButtonText}>Abrir en Maps</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={() => handleEventPress(selectedEvent.id)}
+                        >
+                            <Text style={styles.secondaryButtonText}>Ver evento</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
+            {/* Selected Event Card */}
+            {selectedEvent && !showDirections && (
+                <View style={[styles.bottomCard, { paddingBottom: insets.bottom + spacing.md }]}>
+                    {/* Close button */}
+                    <TouchableOpacity
+                        style={styles.cardCloseButton}
+                        onPress={() => setSelectedEvent(null)}
+                    >
+                        <Ionicons name="close" size={20} color={colors.text.secondary} />
+                    </TouchableOpacity>
+
+                    {/* Event content with image */}
+                    <View style={styles.eventContent}>
+                        {/* Image or placeholder */}
+                        {selectedEvent.coverImage ? (
+                            <Image
+                                source={{ uri: selectedEvent.coverImage }}
+                                style={styles.eventImage}
+                                resizeMode="cover"
+                            />
+                        ) : (
+                            <View style={styles.eventImagePlaceholder}>
+                                <Ionicons
+                                    name={getCategoryIcon(selectedEvent.categoryName) as any}
+                                    size={28}
+                                    color={colors.primary}
+                                />
                             </View>
                         )}
 
-                        <View style={styles.directionsActions}>
-                            <TouchableOpacity
-                                style={styles.openMapsButton}
-                                onPress={() => openExternalMaps(selectedEvent)}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name="map-outline" size={18} color={colors.text.inverse} />
-                                <Text style={styles.openMapsButtonText}>Abrir en Maps</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.viewEventButton}
-                                onPress={() => handleEventPress(selectedEvent.id)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.viewEventButtonText}>Ver evento</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            )}
-
-            {/* Selected Event Card (when not in directions mode) */}
-            {selectedEvent && !showDirections && (
-                <View style={styles.eventCard}>
-                    <View style={styles.eventCardContent}>
-                        <View style={styles.eventCardHeader}>
+                        {/* Event details */}
+                        <View style={styles.eventDetails}>
                             <View style={styles.categoryBadge}>
-                                <Text style={styles.categoryText}>
-                                    {selectedEvent.categoryName}
+                                <Text style={styles.categoryText}>{selectedEvent.categoryName}</Text>
+                            </View>
+
+                            <Text style={styles.eventTitle} numberOfLines={2}>{selectedEvent.title}</Text>
+
+                            <View style={styles.eventInfo}>
+                                <Ionicons name="calendar-outline" size={14} color={colors.text.secondary} />
+                                <Text style={styles.eventInfoText}>
+                                    {formatDate(selectedEvent.startDate)} · {formatTime(selectedEvent.startDate)}
                                 </Text>
                             </View>
-                            <TouchableOpacity
-                                onPress={() => setSelectedEvent(null)}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            >
-                                <Ionicons name="close" size={24} color={colors.text.secondary} />
-                            </TouchableOpacity>
+
+                            <View style={styles.eventInfo}>
+                                <Ionicons name="location-outline" size={14} color={colors.text.secondary} />
+                                <Text style={styles.eventInfoText} numberOfLines={1}>{selectedEvent.location}</Text>
+                            </View>
                         </View>
-                        <Text style={styles.eventCardTitle} numberOfLines={2}>
-                            {selectedEvent.title}
-                        </Text>
-                        <View style={styles.eventCardInfo}>
-                            <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-                            <Text style={styles.eventCardInfoText}>
-                                {formatDate(selectedEvent.startDate)} · {formatTime(selectedEvent.startDate)}
-                            </Text>
-                        </View>
-                        <View style={styles.eventCardInfo}>
-                            <Ionicons name="location-outline" size={16} color={colors.primary} />
-                            <Text style={styles.eventCardInfoText} numberOfLines={1}>
-                                {selectedEvent.location}
-                            </Text>
-                        </View>
-                        <View style={styles.eventCardFooter}>
-                            <TouchableOpacity
-                                style={styles.directionsButton}
-                                onPress={() => handleGetDirections(selectedEvent)}
-                                activeOpacity={0.7}
-                                disabled={loadingLocation}
-                            >
-                                {loadingLocation ? (
-                                    <ActivityIndicator size="small" color={colors.text.inverse} />
-                                ) : (
-                                    <>
-                                        <Ionicons name="navigate" size={18} color={colors.text.inverse} />
-                                        <Text style={styles.directionsButtonText}>Como llegar</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.viewButton}
-                                onPress={() => handleEventPress(selectedEvent.id)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.viewButtonText}>Ver evento</Text>
-                                <Ionicons
-                                    name="chevron-forward"
-                                    size={16}
-                                    color={colors.primary}
-                                />
-                            </TouchableOpacity>
-                        </View>
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.actions}>
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() => handleGetDirections(selectedEvent)}
+                            disabled={loadingLocation}
+                        >
+                            {loadingLocation ? (
+                                <ActivityIndicator size="small" color={colors.text.inverse} />
+                            ) : (
+                                <>
+                                    <Ionicons name="navigate" size={18} color={colors.text.inverse} />
+                                    <Text style={styles.primaryButtonText}>Cómo llegar</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={() => handleEventPress(selectedEvent.id)}
+                        >
+                            <Text style={styles.secondaryButtonText}>Ver detalles</Text>
+                            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                        </TouchableOpacity>
                     </View>
                 </View>
             )}
-        </SafeAreaView>
+        </View>
     );
 };
 
@@ -480,349 +729,397 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
-    header: {
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-    },
-    headerTitle: {
-        fontSize: typography.h2.fontSize,
-        fontWeight: typography.h2.fontWeight,
-        color: colors.text.primary,
-    },
-    headerSubtitle: {
-        fontSize: typography.bodySmall.fontSize,
-        color: colors.text.secondary,
-        marginTop: spacing.xs,
-    },
-    mapContainer: {
+    loadingContainer: {
         flex: 1,
-        position: 'relative',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.background,
     },
     map: {
         flex: 1,
     },
+    // Search
+    searchContainer: {
+        position: 'absolute',
+        left: spacing.md,
+        right: spacing.md,
+        zIndex: 10,
+    },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        gap: spacing.sm,
+        ...shadows.md,
+    },
+    searchBarFocused: {
+        borderWidth: 2,
+        borderColor: colors.primary,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: typography.body.fontSize,
+        color: colors.text.primary,
+        paddingVertical: 2,
+    },
+    // Search Results Dropdown
+    searchResultsDropdown: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.lg,
+        marginTop: spacing.xs,
+        ...shadows.md,
+        overflow: 'hidden',
+    },
+    searchResultsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    searchResultsCount: {
+        fontSize: typography.caption.fontSize,
+        fontWeight: '600',
+        color: colors.text.secondary,
+    },
+    searchResultsList: {
+        maxHeight: 250,
+    },
+    searchResultItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+        gap: spacing.sm,
+    },
+    searchResultImage: {
+        width: 40,
+        height: 40,
+        borderRadius: borderRadius.sm,
+        backgroundColor: colors.background,
+    },
+    searchResultIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: borderRadius.sm,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    searchResultInfo: {
+        flex: 1,
+    },
+    searchResultTitle: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '500',
+        color: colors.text.primary,
+        marginBottom: 2,
+    },
+    searchResultMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    searchResultLocation: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.disabled,
+        flex: 1,
+    },
+    moreResultsHint: {
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+        backgroundColor: colors.background,
+    },
+    moreResultsText: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
+        fontWeight: '500',
+    },
+    noResultsContainer: {
+        padding: spacing.lg,
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    noResultsText: {
+        fontSize: typography.body.fontSize,
+        color: colors.text.disabled,
+    },
+    // Map Controls
+    mapControls: {
+        position: 'absolute',
+        right: spacing.md,
+        gap: spacing.sm,
+    },
+    mapButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...shadows.md,
+    },
+    closeButton: {
+        position: 'absolute',
+        right: spacing.md,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...shadows.md,
+    },
+    // Markers
     markerContainer: {
         alignItems: 'center',
     },
     marker: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
+        borderWidth: 3,
+        borderColor: colors.surface,
+        ...shadows.md,
     },
     markerSelected: {
         backgroundColor: colors.success,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
     },
-    markerTail: {
-        width: 0,
-        height: 0,
-        borderLeftWidth: 8,
-        borderRightWidth: 8,
-        borderTopWidth: 10,
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
-        borderTopColor: colors.primary,
-        marginTop: -2,
-    },
-    markerTailSelected: {
-        borderTopColor: colors.success,
-        borderLeftWidth: 10,
-        borderRightWidth: 10,
-        borderTopWidth: 12,
-    },
-    callout: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        minWidth: 200,
-        maxWidth: 280,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    calloutTitle: {
-        fontSize: typography.body.fontSize,
-        fontWeight: '600',
-        color: colors.text.primary,
-        marginBottom: spacing.sm,
-    },
-    calloutInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xs,
-        marginBottom: spacing.xs,
-    },
-    calloutDate: {
-        fontSize: typography.bodySmall.fontSize,
-        color: colors.text.secondary,
-    },
-    calloutCta: {
-        fontSize: typography.caption.fontSize,
-        color: colors.primary,
-        fontWeight: '600',
-        marginTop: spacing.sm,
-        textAlign: 'center',
-    },
-    centerButton: {
-        position: 'absolute',
-        top: spacing.md,
-        right: spacing.md,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-    refreshButton: {
-        position: 'absolute',
-        top: spacing.md + 56,
-        right: spacing.md,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-    closeDirectionsButton: {
-        position: 'absolute',
-        top: spacing.md,
-        right: spacing.md,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-    },
+    // Empty State
     emptyState: {
-        flex: 1,
-        justifyContent: 'center',
+        position: 'absolute',
+        top: '50%',
+        left: 0,
+        right: 0,
         alignItems: 'center',
-        padding: spacing.xl,
-    },
-    emptyTitle: {
-        fontSize: typography.h3.fontSize,
-        fontWeight: '600',
-        color: colors.text.primary,
-        marginTop: spacing.md,
+        marginTop: -50,
     },
     emptyText: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
-        textAlign: 'center',
-        marginTop: spacing.xs,
+        marginTop: spacing.sm,
     },
-    // Directions Card
-    directionsCard: {
+    // Bottom Card
+    bottomCard: {
         position: 'absolute',
-        bottom: spacing.lg,
-        left: spacing.md,
-        right: spacing.md,
+        bottom: 0,
+        left: 0,
+        right: 0,
         backgroundColor: colors.surface,
-        borderRadius: borderRadius.xl,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    directionsCardContent: {
+        borderTopLeftRadius: borderRadius.xl,
+        borderTopRightRadius: borderRadius.xl,
         padding: spacing.lg,
+        ...shadows.lg,
     },
-    directionsHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    // Transport
+    transportScroll: {
+        marginHorizontal: -spacing.lg,
         marginBottom: spacing.md,
     },
-    directionsIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.primaryLight,
-        justifyContent: 'center',
+    transportContainer: {
+        paddingHorizontal: spacing.lg,
+        gap: spacing.sm,
+    },
+    transportChip: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginRight: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.background,
+        gap: spacing.xs,
     },
-    directionsInfo: {
+    transportChipActive: {
+        backgroundColor: colors.primary,
+    },
+    transportChipText: {
+        fontSize: typography.bodySmall.fontSize,
+        fontWeight: '500',
+        color: colors.text.secondary,
+    },
+    transportChipTextActive: {
+        color: colors.text.inverse,
+    },
+    // Route Info
+    routeInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primaryLight,
+        borderRadius: borderRadius.md,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+    },
+    routeInfoItem: {
         flex: 1,
+        alignItems: 'center',
     },
-    directionsTitle: {
-        fontSize: typography.body.fontSize,
-        fontWeight: '600',
+    routeInfoValue: {
+        fontSize: typography.h4.fontSize,
+        fontWeight: '700',
         color: colors.text.primary,
     },
-    directionsSubtitle: {
+    routeInfoLabel: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
+    },
+    routeInfoDivider: {
+        width: 1,
+        height: 30,
+        backgroundColor: colors.border,
+    },
+    loadingRoute: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: spacing.sm,
+        gap: spacing.sm,
+    },
+    loadingRouteText: {
         fontSize: typography.bodySmall.fontSize,
         color: colors.text.secondary,
-        marginTop: 2,
     },
-    distanceContainer: {
+    // Destination
+    destination: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: colors.background,
-        padding: spacing.md,
         borderRadius: borderRadius.md,
+        padding: spacing.md,
         marginBottom: spacing.md,
-        gap: spacing.sm,
     },
-    distanceText: {
+    destinationIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.sm,
+    },
+    destinationText: {
+        flex: 1,
+    },
+    destinationTitle: {
         fontSize: typography.body.fontSize,
-        color: colors.text.secondary,
-    },
-    distanceBold: {
         fontWeight: '600',
         color: colors.text.primary,
     },
-    directionsActions: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-    },
-    openMapsButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.xs,
-        backgroundColor: colors.primary,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.md,
-    },
-    openMapsButtonText: {
-        fontSize: typography.body.fontSize,
-        fontWeight: '600',
-        color: colors.text.inverse,
-    },
-    viewEventButton: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.primaryLight,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.md,
-    },
-    viewEventButtonText: {
-        fontSize: typography.body.fontSize,
-        fontWeight: '600',
-        color: colors.primary,
+    destinationSubtitle: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
     },
     // Event Card
-    eventCard: {
+    cardCloseButton: {
         position: 'absolute',
-        bottom: spacing.lg,
-        left: spacing.md,
-        right: spacing.md,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.xl,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    eventCardContent: {
-        padding: spacing.lg,
-    },
-    eventCardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        top: spacing.sm,
+        right: spacing.sm,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.background,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: spacing.sm,
+        zIndex: 10,
+    },
+    eventContent: {
+        flexDirection: 'row',
+        gap: spacing.md,
+    },
+    eventImage: {
+        width: 80,
+        height: 80,
+        borderRadius: borderRadius.md,
+        backgroundColor: colors.background,
+    },
+    eventImagePlaceholder: {
+        width: 80,
+        height: 80,
+        borderRadius: borderRadius.md,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    eventDetails: {
+        flex: 1,
+        paddingRight: spacing.lg,
     },
     categoryBadge: {
-        backgroundColor: colors.primary + '15',
+        alignSelf: 'flex-start',
+        backgroundColor: colors.primaryLight,
         paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
+        paddingVertical: 2,
         borderRadius: borderRadius.full,
+        marginBottom: spacing.xs,
     },
     categoryText: {
         fontSize: typography.caption.fontSize,
         fontWeight: '600',
         color: colors.primary,
-        textTransform: 'uppercase',
     },
-    eventCardTitle: {
-        fontSize: typography.h4.fontSize,
-        fontWeight: typography.h4.fontWeight,
+    eventTitle: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '600',
         color: colors.text.primary,
-        marginBottom: spacing.md,
-    },
-    eventCardInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
         marginBottom: spacing.xs,
     },
-    eventCardInfoText: {
-        fontSize: typography.bodySmall.fontSize,
+    eventInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        marginBottom: 2,
+    },
+    eventInfoText: {
+        fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
         flex: 1,
     },
-    eventCardFooter: {
+    // Actions
+    actions: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: spacing.md,
-        paddingTop: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.borderLight,
         gap: spacing.sm,
+        marginTop: spacing.md,
     },
-    directionsButton: {
+    primaryButton: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: spacing.xs,
         backgroundColor: colors.primary,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        paddingVertical: spacing.md,
         borderRadius: borderRadius.md,
-        minWidth: 130,
+        gap: spacing.xs,
     },
-    directionsButtonText: {
-        fontSize: typography.bodySmall.fontSize,
+    primaryButtonText: {
+        fontSize: typography.body.fontSize,
         fontWeight: '600',
         color: colors.text.inverse,
     },
-    viewButton: {
+    secondaryButton: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.xs,
+        justifyContent: 'center',
         backgroundColor: colors.primaryLight,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        paddingVertical: spacing.md,
         borderRadius: borderRadius.md,
+        gap: spacing.xs,
     },
-    viewButtonText: {
-        fontSize: typography.bodySmall.fontSize,
+    secondaryButtonText: {
+        fontSize: typography.body.fontSize,
         fontWeight: '600',
         color: colors.primary,
     },

@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: azuevento-api
+    env: java
+    buildCommand: ./gradlew clean build -x test
+    startCommand: java -Dserver.port=$PORT -jar build/libs/*.jar
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: azuevento-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: azuevento-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: azuevento-db
+          property: password
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update
+      - key: SPRING_JPA_SHOW_SQL
+        value: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION
+        value: 86400000
+      - key: CORS_ALLOWED_ORIGINS
+        value: "*"
+
+databases:
+  - name: azuevento-db
+    databaseName: azuevento
+    user: azuevento_user

@@ -1,14 +1,19 @@
 export const colors = {
-    // Primary palette - Modern vibrant purple
-    primary: '#6C63FF',
-    primaryLight: '#A29DFF',
-    primaryDark: '#4338CA',
-    primaryGradient: ['#6C63FF', '#4F46E5'] as const,
+    // Primary palette - Azul Cuenca (Cúpulas de la Catedral)
+    primary: '#4A90E2',
+    primaryLight: '#7FB3F0',
+    primaryDark: '#357ABD',
+    primaryGradient: ['#4A90E2', '#357ABD'] as const,
 
-    // Secondary palette - Coral/Pink
-    secondary: '#FF6B9D',
-    secondaryLight: '#FFB4D5',
-    secondaryDark: '#E63980',
+    // Secondary palette - Terracota Andina (Tejados coloniales)
+    secondary: '#E07B39',
+    secondaryLight: '#F0A066',
+    secondaryDark: '#C96A2E',
+
+    // Accent - Dorado Colonial (Detalles de iglesias)
+    accent: '#F4B942',
+    accentLight: '#F7CC6F',
+    accentDark: '#E0A830',
 
     // Neutral palette
     background: '#F8FAFC',
@@ -26,17 +31,16 @@ export const colors = {
         secondary: '#64748B',
         disabled: '#94A3B8',
         inverse: '#FFFFFF',
-        link: '#6C63FF',
+        link: '#4A90E2', // Azul Cuenca para links
     },
 
     // Status colors
-    success: '#34C759',
+    success: '#2ECC71', // Verde Páramo
     successLight: '#D1FAE5',
-    warning: '#F59E0B',
+    warning: '#F4B942', // Dorado Colonial (mismo que accent)
     warningLight: '#FEF3C7',
-    error: '#FF3B30',
-    warningRating: '#FFB800', // Color dorado para ratings
-    info: '#3B82F6',
+    error: '#E74C3C', // Rojo cálido
+    info: '#3498DB', // Azul cielo
     infoLight: '#DBEAFE',
 } as const;
 
@@ -78,6 +82,11 @@ export const typography = {
         fontSize: 20,
         fontWeight: '600' as const,
         lineHeight: 28,
+    },
+    h5: {
+        fontSize: 18,
+        fontWeight: '600' as const,
+        lineHeight: 24,
     },
     body: {
         fontSize: 16,

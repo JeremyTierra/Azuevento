@@ -1,13 +1,17 @@
 import { Platform } from 'react-native';
 
 // API Base URL configuration
-// IMPORTANTE: Estás usando DISPOSITIVO REAL (no emulator)
-// Tu máquina y celular deben estar en la MISMA RED WiFi
+// Configure via .env file or change LOCAL_IP below
 export const getApiUrl = () => {
+    // Check for environment variable first
+    if (process.env.EXPO_PUBLIC_API_URL) {
+        return process.env.EXPO_PUBLIC_API_URL;
+    }
+
     if (__DEV__) {
         // Development
         // REEMPLAZA CON TU IP LOCAL (ipconfig en Windows)
-        const LOCAL_IP = '192.168.18.203'; // ⚠️ Cambia esto si tu IP es diferente
+        const LOCAL_IP = '192.168.18.203'; // ⚠️ O usa EXPO_PUBLIC_API_URL en .env
 
         // Para DISPOSITIVO REAL (Android y iOS)
         return `http://${LOCAL_IP}:8080/api`;

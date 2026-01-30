@@ -8,9 +8,10 @@ import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { CreateEventScreen } from '../screens/CreateEventScreen';
 import { MyEventsScreen } from '../screens/MyEventsScreen';
 import { CommentsScreen } from '../screens/CommentsScreen';
-import { FavoritesScreen } from '../screens/FavoritesScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import { colors } from '../theme';
 
 // Stack navigation types for each tab
@@ -18,13 +19,6 @@ export type ExploreStackParamList = {
     ExploreHome: undefined;
     EventDetail: { eventId: number };
     CreateEvent: undefined;
-    MyEvents: undefined;
-    Comments: { eventId: number; eventTitle: string };
-};
-
-export type FavoritesStackParamList = {
-    FavoritesList: undefined;
-    EventDetail: { eventId: number };
     Comments: { eventId: number; eventTitle: string };
 };
 
@@ -34,17 +28,31 @@ export type MapStackParamList = {
     Comments: { eventId: number; eventTitle: string };
 };
 
+export type MyEventsStackParamList = {
+    MyEventsList: undefined;
+    EventDetail: { eventId: number };
+    CreateEvent: undefined;
+    Comments: { eventId: number; eventTitle: string };
+};
+
 export type TabParamList = {
     Explore: undefined;
-    Favorites: undefined;
+    MyEvents: undefined;
     Map: undefined;
     Profile: undefined;
 };
 
+export type ProfileStackParamList = {
+    ProfileMain: undefined;
+    EditProfile: undefined;
+    ChangePassword: undefined;
+};
+
 const Tab = createBottomTabNavigator<TabParamList>();
 const ExploreStack = createNativeStackNavigator<ExploreStackParamList>();
-const FavoritesStack = createNativeStackNavigator<FavoritesStackParamList>();
 const MapStack = createNativeStackNavigator<MapStackParamList>();
+const MyEventsStack = createNativeStackNavigator<MyEventsStackParamList>();
+const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
 // Explore Stack Navigator
 const ExploreNavigator = () => {
@@ -67,38 +75,10 @@ const ExploreNavigator = () => {
                 component={CreateEventScreen}
             />
             <ExploreStack.Screen
-                name="MyEvents"
-                component={MyEventsScreen}
-            />
-            <ExploreStack.Screen
                 name="Comments"
                 component={CommentsScreen}
             />
         </ExploreStack.Navigator>
-    );
-};
-
-// Favorites Stack Navigator
-const FavoritesNavigator = () => {
-    return (
-        <FavoritesStack.Navigator
-            screenOptions={{
-                headerShown: false,
-            }}
-        >
-            <FavoritesStack.Screen
-                name="FavoritesList"
-                component={FavoritesScreen}
-            />
-            <FavoritesStack.Screen
-                name="EventDetail"
-                component={EventDetailScreen}
-            />
-            <FavoritesStack.Screen
-                name="Comments"
-                component={CommentsScreen}
-            />
-        </FavoritesStack.Navigator>
     );
 };
 
@@ -126,6 +106,59 @@ const MapNavigator = () => {
     );
 };
 
+// MyEvents Stack Navigator
+const MyEventsNavigator = () => {
+    return (
+        <MyEventsStack.Navigator
+            screenOptions={{
+                headerShown: false,
+            }}
+        >
+            <MyEventsStack.Screen
+                name="MyEventsList"
+                component={MyEventsScreen}
+            />
+            <MyEventsStack.Screen
+                name="EventDetail"
+                component={EventDetailScreen}
+            />
+            <MyEventsStack.Screen
+                name="CreateEvent"
+                component={CreateEventScreen}
+            />
+            <MyEventsStack.Screen
+                name="Comments"
+                component={CommentsScreen}
+            />
+        </MyEventsStack.Navigator>
+    );
+};
+
+// Profile Navigator
+const ProfileNavigator = () => {
+    return (
+        <ProfileStack.Navigator
+            screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+            }}
+        >
+            <ProfileStack.Screen
+                name="ProfileMain"
+                component={ProfileScreen}
+            />
+            <ProfileStack.Screen
+                name="EditProfile"
+                component={EditProfileScreen}
+            />
+            <ProfileStack.Screen
+                name="ChangePassword"
+                component={ChangePasswordScreen}
+            />
+        </ProfileStack.Navigator>
+    );
+};
+
 // Main Tab Navigator
 export const TabNavigator = () => {
     const insets = useSafeAreaInsets();
@@ -139,8 +172,8 @@ export const TabNavigator = () => {
 
                     if (route.name === 'Explore') {
                         iconName = focused ? 'compass' : 'compass-outline';
-                    } else if (route.name === 'Favorites') {
-                        iconName = focused ? 'heart' : 'heart-outline';
+                    } else if (route.name === 'MyEvents') {
+                        iconName = focused ? 'calendar' : 'calendar-outline';
                     } else if (route.name === 'Map') {
                         iconName = focused ? 'map' : 'map-outline';
                     } else if (route.name === 'Profile') {
@@ -172,9 +205,9 @@ export const TabNavigator = () => {
                 options={{ tabBarLabel: 'Explorar' }}
             />
             <Tab.Screen
-                name="Favorites"
-                component={FavoritesNavigator}
-                options={{ tabBarLabel: 'Favoritos' }}
+                name="MyEvents"
+                component={MyEventsNavigator}
+                options={{ tabBarLabel: 'Mis Eventos' }}
             />
             <Tab.Screen
                 name="Map"
@@ -183,7 +216,7 @@ export const TabNavigator = () => {
             />
             <Tab.Screen
                 name="Profile"
-                component={ProfileScreen}
+                component={ProfileNavigator}
                 options={{ tabBarLabel: 'Perfil' }}
             />
         </Tab.Navigator>

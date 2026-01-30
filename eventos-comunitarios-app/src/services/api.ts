@@ -12,7 +12,7 @@ const api = axios.create({
     },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and log requests
 api.interceptors.request.use(
     async (config) => {
         try {
@@ -23,15 +23,37 @@ api.interceptors.request.use(
         } catch (error) {
             console.error('Error getting token from storage:', error);
         }
+
+        // Log request for debugging
+        if (__DEV__) {
+            console.log(`🚀 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+            if (config.data) {
+                console.log('📦 Request Body:', JSON.stringify(config.data, null, 2));
+            }
+        }
+
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// Response interceptor for  error handling  
+// Response interceptor for logging and error handling
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // Log successful response
+        if (__DEV__) {
+            console.log(`✅ ${response.status} ${response.config.url}`);
+        }
+        return response;
+    },
     async (error: AxiosError<ApiError>) => {
+        // Log error response
+        if (__DEV__) {
+            console.log(`❌ ${error.response?.status || 'Network Error'} ${error.config?.url}`);
+            if (error.response?.data) {
+                console.log('📛 Error:', JSON.stringify(error.response.data, null, 2));
+            }
+        }
         // Handle 401 Unauthorized (token expired/invalid)
         if (error.response?.status === 401) {
             // Clear stored auth data

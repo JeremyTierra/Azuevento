@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -20,8 +20,10 @@ import { eventService } from '../services/eventService';
 import { categoryService } from '../services/categoryService';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { DateTimePicker } from '../components/DateTimePicker';
 import type { Category, EventRequest } from '../types/models';
 import { colors, spacing, borderRadius, typography } from '../theme';
+import { getCategoryIcon } from '../utils/formatters';
 
 type CreateEventNavigationProp = NativeStackNavigationProp<ExploreStackParamList, 'CreateEvent'>;
 
@@ -38,8 +40,41 @@ type Coordinates = {
     longitude: number;
 };
 
+// Format date for display
+const formatDisplayDate = (date: Date): string => {
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    const dayName = days[date.getDay()];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+
+    return `${dayName}, ${day} ${month} ${year}`;
+};
+
+// Format time for display
+const formatDisplayTime = (date: Date): string => {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+};
+
+// Format date for API (ISO 8601 format: yyyy-MM-ddTHH:mm:ss)
+const formatForAPI = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:00`;
+};
+
 export const CreateEventScreen: React.FC = () => {
     const navigation = useNavigation<CreateEventNavigationProp>();
+    const scrollViewRef = useRef<ScrollView>(null);
+
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(false);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -47,12 +82,22 @@ export const CreateEventScreen: React.FC = () => {
     const [tempCoordinates, setTempCoordinates] = useState<Coordinates | null>(null);
     const [loadingLocation, setLoadingLocation] = useState(false);
 
-    const [formData, setFormData] = useState<EventRequest>({
+    // Date/Time picker states
+    const [startDate, setStartDate] = useState<Date>(new Date());
+    const [endDate, setEndDate] = useState<Date | null>(null);
+    const [hasStartDate, setHasStartDate] = useState(false);
+    const [hasEndDate, setHasEndDate] = useState(false);
+
+    // Picker visibility
+    const [showStartPicker, setShowStartPicker] = useState(false);
+    const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+    const [showEndPicker, setShowEndPicker] = useState(false);
+    const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+
+    const [formData, setFormData] = useState<Omit<EventRequest, 'startDate' | 'endDate'> & { startDate?: string; endDate?: string }>({
         title: '',
         description: '',
         categoryId: 0,
-        startDate: '',
-        endDate: '',
         location: '',
         visibility: 'PUBLIC',
     });
@@ -61,6 +106,11 @@ export const CreateEventScreen: React.FC = () => {
 
     useEffect(() => {
         loadCategories();
+        // Set default start date to tomorrow at 10:00
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(10, 0, 0, 0);
+        setStartDate(tomorrow);
     }, []);
 
     const loadCategories = async () => {
@@ -72,9 +122,50 @@ export const CreateEventScreen: React.FC = () => {
         }
     };
 
-    const updateField = (field: keyof EventRequest, value: any) => {
+    const updateField = (field: string, value: any) => {
         setFormData({ ...formData, [field]: value });
-        setErrors({ ...errors, [field]: undefined });
+        if (errors[field]) {
+            setErrors({ ...errors, [field]: '' });
+        }
+    };
+
+    // Date picker handlers
+    const handleStartDateConfirm = (date: Date) => {
+        setStartDate(date);
+        setHasStartDate(true);
+        setShowStartPicker(false);
+        if (errors.startDate) {
+            setErrors({ ...errors, startDate: '' });
+        }
+    };
+
+    const handleStartTimeConfirm = (date: Date) => {
+        const newDate = new Date(startDate);
+        newDate.setHours(date.getHours());
+        newDate.setMinutes(date.getMinutes());
+        setStartDate(newDate);
+        setHasStartDate(true);
+        setShowStartTimePicker(false);
+    };
+
+    const handleEndDateConfirm = (date: Date) => {
+        setEndDate(date);
+        setHasEndDate(true);
+        setShowEndPicker(false);
+    };
+
+    const handleEndTimeConfirm = (date: Date) => {
+        const newDate = endDate ? new Date(endDate) : new Date(startDate);
+        newDate.setHours(date.getHours());
+        newDate.setMinutes(date.getMinutes());
+        setEndDate(newDate);
+        setHasEndDate(true);
+        setShowEndTimePicker(false);
+    };
+
+    const clearEndDate = () => {
+        setEndDate(null);
+        setHasEndDate(false);
     };
 
     const validate = (): boolean => {
@@ -100,11 +191,29 @@ export const CreateEventScreen: React.FC = () => {
             newErrors.location = 'La ubicación es requerida';
         }
 
-        if (!formData.startDate) {
-            newErrors.startDate = 'La fecha de inicio es requerida';
+        if (!hasStartDate) {
+            newErrors.startDate = 'Selecciona la fecha y hora de inicio';
+        } else if (startDate < new Date()) {
+            newErrors.startDate = 'La fecha de inicio debe ser en el futuro';
+        }
+
+        if (hasEndDate && endDate && endDate <= startDate) {
+            newErrors.endDate = 'La fecha de fin debe ser posterior al inicio';
         }
 
         setErrors(newErrors);
+
+        // Show alert with first error and scroll to top
+        if (Object.keys(newErrors).length > 0) {
+            const errorMessages = Object.values(newErrors);
+            Alert.alert(
+                'Campos incompletos',
+                errorMessages.join('\n'),
+                [{ text: 'Entendido' }]
+            );
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        }
+
         return Object.keys(newErrors).length === 0;
     };
 
@@ -113,7 +222,13 @@ export const CreateEventScreen: React.FC = () => {
 
         setLoading(true);
         try {
-            const event = await eventService.create(formData);
+            const eventData: EventRequest = {
+                ...formData,
+                startDate: formatForAPI(startDate),
+                endDate: hasEndDate && endDate ? formatForAPI(endDate) : '',
+            };
+
+            const event = await eventService.create(eventData);
 
             if (publish) {
                 await eventService.publish(event.id);
@@ -132,7 +247,6 @@ export const CreateEventScreen: React.FC = () => {
 
     // Map functions
     const handleOpenMapModal = () => {
-        // Initialize temp coordinates with existing coordinates or null
         if (formData.latitude && formData.longitude) {
             setTempCoordinates({
                 latitude: formData.latitude,
@@ -202,69 +316,160 @@ export const CreateEventScreen: React.FC = () => {
                 <View style={styles.headerSpacer} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView
+                ref={scrollViewRef}
+                contentContainerStyle={styles.content}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Basic Info Section */}
                 <Text style={styles.sectionTitle}>Información Básica</Text>
 
                 <Input
-                    label="Título del evento"
+                    label="Título del evento *"
                     placeholder="Ej: Torneo de fútbol 5"
                     value={formData.title}
                     onChangeText={(text) => updateField('title', text)}
                     error={errors.title}
+                    maxLength={100}
                 />
 
                 <Input
-                    label="Descripción"
-                    placeholder="Describe tu evento..."
+                    label="Descripción *"
+                    placeholder="Describe tu evento: qué se hará, qué traer, etc."
                     value={formData.description}
                     onChangeText={(text) => updateField('description', text)}
                     error={errors.description}
                     multiline
                     numberOfLines={4}
                     style={{ height: 100, textAlignVertical: 'top' }}
+                    maxLength={1000}
                 />
 
+                {/* Category Selector */}
                 <TouchableOpacity
-                    style={styles.categorySelector}
+                    style={styles.selectorContainer}
                     onPress={() => setShowCategoryModal(true)}
                 >
                     <Text style={styles.label}>Categoría *</Text>
-                    <View style={[styles.categoryButton, errors.categoryId && styles.errorBorder]}>
-                        <Text style={selectedCategory ? styles.categorySelected : styles.categoryPlaceholder}>
-                            {selectedCategory ? selectedCategory.name : 'Selecciona una categoría'}
-                        </Text>
-                        <Text style={styles.arrow}>▼</Text>
+                    <View style={[styles.selector, errors.categoryId && styles.selectorError]}>
+                        {selectedCategory ? (
+                            <View style={styles.selectedCategory}>
+                                <View style={styles.categoryIconBadge}>
+                                    <Ionicons
+                                        name={getCategoryIcon(selectedCategory.name) as any}
+                                        size={18}
+                                        color={colors.primary}
+                                    />
+                                </View>
+                                <Text style={styles.selectorText}>{selectedCategory.name}</Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.selectorPlaceholder}>Selecciona una categoría</Text>
+                        )}
+                        <Ionicons name="chevron-down" size={20} color={colors.text.secondary} />
                     </View>
                     {errors.categoryId && <Text style={styles.errorText}>{errors.categoryId}</Text>}
                 </TouchableOpacity>
 
-                <Text style={styles.sectionTitle}>Fecha y Ubicación</Text>
+                {/* Date & Time Section */}
+                <Text style={styles.sectionTitle}>Fecha y Hora</Text>
+
+                {/* Start Date/Time */}
+                <View style={styles.dateTimeSection}>
+                    <Text style={styles.label}>Inicio del evento *</Text>
+                    <View style={styles.dateTimeRow}>
+                        {/* Date Selector */}
+                        <TouchableOpacity
+                            style={[styles.dateTimeButton, styles.dateButton, errors.startDate && styles.selectorError]}
+                            onPress={() => setShowStartPicker(true)}
+                        >
+                            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                            <Text style={hasStartDate ? styles.dateTimeText : styles.dateTimePlaceholder}>
+                                {hasStartDate ? formatDisplayDate(startDate) : 'Seleccionar fecha'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Time Selector */}
+                        <TouchableOpacity
+                            style={[styles.dateTimeButton, styles.timeButton]}
+                            onPress={() => setShowStartTimePicker(true)}
+                        >
+                            <Ionicons name="time-outline" size={20} color={colors.primary} />
+                            <Text style={hasStartDate ? styles.dateTimeText : styles.dateTimePlaceholder}>
+                                {hasStartDate ? formatDisplayTime(startDate) : '00:00'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                    {errors.startDate && <Text style={styles.errorText}>{errors.startDate}</Text>}
+                </View>
+
+                {/* End Date/Time */}
+                <View style={styles.dateTimeSection}>
+                    <View style={styles.labelRow}>
+                        <Text style={styles.label}>Fin del evento (opcional)</Text>
+                        {hasEndDate && (
+                            <TouchableOpacity onPress={clearEndDate}>
+                                <Text style={styles.clearButton}>Quitar</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <View style={styles.dateTimeRow}>
+                        {/* Date Selector */}
+                        <TouchableOpacity
+                            style={[styles.dateTimeButton, styles.dateButton, errors.endDate && styles.selectorError]}
+                            onPress={() => {
+                                if (!hasEndDate) {
+                                    // Initialize end date 2 hours after start
+                                    const defaultEnd = new Date(startDate);
+                                    defaultEnd.setHours(defaultEnd.getHours() + 2);
+                                    setEndDate(defaultEnd);
+                                }
+                                setShowEndPicker(true);
+                            }}
+                        >
+                            <Ionicons name="calendar-outline" size={20} color={hasEndDate ? colors.primary : colors.text.disabled} />
+                            <Text style={hasEndDate ? styles.dateTimeText : styles.dateTimePlaceholder}>
+                                {hasEndDate && endDate ? formatDisplayDate(endDate) : 'Seleccionar fecha'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Time Selector */}
+                        <TouchableOpacity
+                            style={[styles.dateTimeButton, styles.timeButton]}
+                            onPress={() => {
+                                if (!hasEndDate) {
+                                    const defaultEnd = new Date(startDate);
+                                    defaultEnd.setHours(defaultEnd.getHours() + 2);
+                                    setEndDate(defaultEnd);
+                                    setHasEndDate(true);
+                                }
+                                setShowEndTimePicker(true);
+                            }}
+                        >
+                            <Ionicons name="time-outline" size={20} color={hasEndDate ? colors.primary : colors.text.disabled} />
+                            <Text style={hasEndDate ? styles.dateTimeText : styles.dateTimePlaceholder}>
+                                {hasEndDate && endDate ? formatDisplayTime(endDate) : '00:00'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                    {errors.endDate && <Text style={styles.errorText}>{errors.endDate}</Text>}
+                </View>
+
+                {/* Location Section */}
+                <Text style={styles.sectionTitle}>Ubicación</Text>
 
                 <Input
-                    label="Fecha de inicio (YYYY-MM-DD HH:MM)"
-                    placeholder="2024-02-15 14:00"
-                    value={formData.startDate}
-                    onChangeText={(text) => updateField('startDate', text)}
-                    error={errors.startDate}
-                />
-
-                <Input
-                    label="Fecha de fin (opcional)"
-                    placeholder="2024-02-15 18:00"
-                    value={formData.endDate || ''}
-                    onChangeText={(text) => updateField('endDate', text)}
-                />
-
-                <Input
-                    label="Dirección"
-                    placeholder="Ej: Estadio Municipal, Cuenca"
+                    label="Dirección *"
+                    placeholder="Ej: Estadio Municipal, Av. Principal"
                     value={formData.location}
                     onChangeText={(text) => updateField('location', text)}
                     error={errors.location}
+                    leftIcon={<Ionicons name="location-outline" size={20} color={colors.text.secondary} />}
                 />
 
-                {/* Location Map Selector */}
-                <View style={styles.locationSelector}>
+                {/* Map Location Selector */}
+                <View style={styles.mapSelector}>
                     <Text style={styles.label}>Ubicación en el mapa</Text>
                     <TouchableOpacity
                         style={[
@@ -273,23 +478,29 @@ export const CreateEventScreen: React.FC = () => {
                         ]}
                         onPress={handleOpenMapModal}
                     >
-                        <Ionicons
-                            name={hasCoordinates ? "location" : "location-outline"}
-                            size={24}
-                            color={hasCoordinates ? colors.success : colors.primary}
-                        />
+                        <View style={[styles.mapIconContainer, hasCoordinates && styles.mapIconContainerSelected]}>
+                            <Ionicons
+                                name={hasCoordinates ? "location" : "map-outline"}
+                                size={24}
+                                color={hasCoordinates ? colors.success : colors.primary}
+                            />
+                        </View>
                         <View style={styles.mapSelectorTextContainer}>
                             <Text style={[
                                 styles.mapSelectorText,
                                 hasCoordinates && styles.mapSelectorTextSelected
                             ]}>
                                 {hasCoordinates
-                                    ? 'Ubicación seleccionada'
-                                    : 'Seleccionar en el mapa'}
+                                    ? 'Ubicación marcada'
+                                    : 'Marcar en el mapa'}
                             </Text>
-                            {hasCoordinates && (
+                            {hasCoordinates ? (
                                 <Text style={styles.coordinatesText}>
                                     {formData.latitude?.toFixed(4)}, {formData.longitude?.toFixed(4)}
+                                </Text>
+                            ) : (
+                                <Text style={styles.mapSelectorHint}>
+                                    Aparecerá en el mapa de eventos
                                 </Text>
                             )}
                         </View>
@@ -304,14 +515,12 @@ export const CreateEventScreen: React.FC = () => {
                             <Ionicons name="chevron-forward" size={24} color={colors.text.secondary} />
                         )}
                     </TouchableOpacity>
-                    <Text style={styles.helperText}>
-                        Selecciona la ubicación para que aparezca en el mapa de eventos
-                    </Text>
                 </View>
 
+                {/* Settings Section */}
                 <Text style={styles.sectionTitle}>Configuración</Text>
 
-                <View style={styles.visibilityContainer}>
+                <View style={styles.settingItem}>
                     <Text style={styles.label}>Visibilidad</Text>
                     <View style={styles.visibilityButtons}>
                         <TouchableOpacity
@@ -323,16 +532,17 @@ export const CreateEventScreen: React.FC = () => {
                         >
                             <Ionicons
                                 name="globe-outline"
-                                size={20}
+                                size={22}
                                 color={formData.visibility === 'PUBLIC' ? colors.primary : colors.text.secondary}
                             />
-                            <Text
-                                style={[
-                                    styles.visibilityText,
-                                    formData.visibility === 'PUBLIC' && styles.visibilityTextSelected,
-                                ]}
-                            >
+                            <Text style={[
+                                styles.visibilityText,
+                                formData.visibility === 'PUBLIC' && styles.visibilityTextSelected,
+                            ]}>
                                 Público
+                            </Text>
+                            <Text style={styles.visibilityHint}>
+                                Todos pueden verlo
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -344,16 +554,17 @@ export const CreateEventScreen: React.FC = () => {
                         >
                             <Ionicons
                                 name="lock-closed-outline"
-                                size={20}
+                                size={22}
                                 color={formData.visibility === 'PRIVATE' ? colors.primary : colors.text.secondary}
                             />
-                            <Text
-                                style={[
-                                    styles.visibilityText,
-                                    formData.visibility === 'PRIVATE' && styles.visibilityTextSelected,
-                                ]}
-                            >
+                            <Text style={[
+                                styles.visibilityText,
+                                formData.visibility === 'PRIVATE' && styles.visibilityTextSelected,
+                            ]}>
                                 Privado
+                            </Text>
+                            <Text style={styles.visibilityHint}>
+                                Solo invitados
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -361,12 +572,14 @@ export const CreateEventScreen: React.FC = () => {
 
                 <Input
                     label="Capacidad máxima (opcional)"
-                    placeholder="Ej: 50"
+                    placeholder="Ej: 50 personas"
                     value={formData.maxCapacity?.toString() || ''}
-                    onChangeText={(text) => updateField('maxCapacity', text ? parseInt(text) : undefined)}
+                    onChangeText={(text) => updateField('maxCapacity', text ? parseInt(text) || undefined : undefined)}
                     keyboardType="number-pad"
+                    leftIcon={<Ionicons name="people-outline" size={20} color={colors.text.secondary} />}
                 />
 
+                {/* Action Buttons */}
                 <View style={styles.buttonContainer}>
                     <Button
                         title="Guardar Borrador"
@@ -384,6 +597,42 @@ export const CreateEventScreen: React.FC = () => {
                 </View>
             </ScrollView>
 
+            {/* Date/Time Pickers */}
+            <DateTimePicker
+                visible={showStartPicker}
+                mode="date"
+                value={startDate}
+                minimumDate={new Date()}
+                onConfirm={handleStartDateConfirm}
+                onCancel={() => setShowStartPicker(false)}
+                title="Fecha de inicio"
+            />
+            <DateTimePicker
+                visible={showStartTimePicker}
+                mode="time"
+                value={startDate}
+                onConfirm={handleStartTimeConfirm}
+                onCancel={() => setShowStartTimePicker(false)}
+                title="Hora de inicio"
+            />
+            <DateTimePicker
+                visible={showEndPicker}
+                mode="date"
+                value={endDate || startDate}
+                minimumDate={startDate}
+                onConfirm={handleEndDateConfirm}
+                onCancel={() => setShowEndPicker(false)}
+                title="Fecha de fin"
+            />
+            <DateTimePicker
+                visible={showEndTimePicker}
+                mode="time"
+                value={endDate || startDate}
+                onConfirm={handleEndTimeConfirm}
+                onCancel={() => setShowEndTimePicker(false)}
+                title="Hora de fin"
+            />
+
             {/* Category Modal */}
             <Modal
                 visible={showCategoryModal}
@@ -396,9 +645,14 @@ export const CreateEventScreen: React.FC = () => {
                     activeOpacity={1}
                     onPress={() => setShowCategoryModal(false)}
                 >
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Selecciona una categoría</Text>
-                        <ScrollView>
+                    <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Selecciona una categoría</Text>
+                            <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                                <Ionicons name="close" size={24} color={colors.text.primary} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView showsVerticalScrollIndicator={false}>
                             {categories.map((category) => (
                                 <TouchableOpacity
                                     key={category.id}
@@ -411,9 +665,29 @@ export const CreateEventScreen: React.FC = () => {
                                         setShowCategoryModal(false);
                                     }}
                                 >
-                                    <Text style={styles.categoryOptionText}>{category.name}</Text>
-                                    {category.description && (
-                                        <Text style={styles.categoryDescription}>{category.description}</Text>
+                                    <View style={[
+                                        styles.categoryOptionIcon,
+                                        formData.categoryId === category.id && styles.categoryOptionIconSelected
+                                    ]}>
+                                        <Ionicons
+                                            name={getCategoryIcon(category.name) as any}
+                                            size={24}
+                                            color={formData.categoryId === category.id ? colors.primary : colors.text.secondary}
+                                        />
+                                    </View>
+                                    <View style={styles.categoryOptionContent}>
+                                        <Text style={[
+                                            styles.categoryOptionText,
+                                            formData.categoryId === category.id && styles.categoryOptionTextSelected
+                                        ]}>
+                                            {category.name}
+                                        </Text>
+                                        {category.description && (
+                                            <Text style={styles.categoryDescription}>{category.description}</Text>
+                                        )}
+                                    </View>
+                                    {formData.categoryId === category.id && (
+                                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                                     )}
                                 </TouchableOpacity>
                             ))}
@@ -429,7 +703,6 @@ export const CreateEventScreen: React.FC = () => {
                 onRequestClose={() => setShowMapModal(false)}
             >
                 <SafeAreaView style={styles.mapModalContainer} edges={['top']}>
-                    {/* Map Modal Header */}
                     <View style={styles.mapModalHeader}>
                         <TouchableOpacity
                             onPress={() => setShowMapModal(false)}
@@ -441,7 +714,6 @@ export const CreateEventScreen: React.FC = () => {
                         <View style={{ width: 40 }} />
                     </View>
 
-                    {/* Instructions */}
                     <View style={styles.mapInstructions}>
                         <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
                         <Text style={styles.mapInstructionsText}>
@@ -449,7 +721,6 @@ export const CreateEventScreen: React.FC = () => {
                         </Text>
                     </View>
 
-                    {/* Map */}
                     <View style={styles.mapContainer}>
                         <MapView
                             style={styles.map}
@@ -482,7 +753,6 @@ export const CreateEventScreen: React.FC = () => {
                         </MapView>
                     </View>
 
-                    {/* Selected coordinates display */}
                     {tempCoordinates && (
                         <View style={styles.selectedCoordinates}>
                             <Ionicons name="checkmark-circle" size={20} color={colors.success} />
@@ -492,7 +762,6 @@ export const CreateEventScreen: React.FC = () => {
                         </View>
                     )}
 
-                    {/* Map Modal Buttons */}
                     <View style={styles.mapModalButtons}>
                         <TouchableOpacity
                             style={styles.useLocationButton}
@@ -539,6 +808,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
+        backgroundColor: colors.surface,
     },
     backButton: {
         padding: spacing.xs,
@@ -563,16 +833,29 @@ const styles = StyleSheet.create({
         marginTop: spacing.lg,
         marginBottom: spacing.md,
     },
-    categorySelector: {
-        marginBottom: spacing.md,
-    },
+    // Labels
     label: {
         fontSize: typography.bodySmall.fontSize,
         fontWeight: '600',
         color: colors.text.primary,
         marginBottom: spacing.xs,
     },
-    categoryButton: {
+    labelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
+    clearButton: {
+        fontSize: typography.bodySmall.fontSize,
+        color: colors.primary,
+        fontWeight: '500',
+    },
+    // Selector
+    selectorContainer: {
+        marginBottom: spacing.md,
+    },
+    selector: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -581,30 +864,72 @@ const styles = StyleSheet.create({
         borderColor: colors.border,
         borderRadius: borderRadius.md,
         paddingHorizontal: spacing.md,
-        height: 48,
+        height: 52,
     },
-    categorySelected: {
+    selectorError: {
+        borderColor: colors.error,
+    },
+    selectorText: {
         fontSize: typography.body.fontSize,
         color: colors.text.primary,
     },
-    categoryPlaceholder: {
+    selectorPlaceholder: {
         fontSize: typography.body.fontSize,
         color: colors.text.disabled,
     },
-    arrow: {
-        fontSize: 12,
-        color: colors.text.secondary,
+    selectedCategory: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
     },
-    errorBorder: {
-        borderColor: colors.error,
+    categoryIconBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     errorText: {
         fontSize: typography.caption.fontSize,
         color: colors.error,
         marginTop: spacing.xs,
     },
-    // Location Selector
-    locationSelector: {
+    // Date/Time
+    dateTimeSection: {
+        marginBottom: spacing.md,
+    },
+    dateTimeRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    dateTimeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.md,
+        paddingHorizontal: spacing.md,
+        height: 52,
+        gap: spacing.sm,
+    },
+    dateButton: {
+        flex: 2,
+    },
+    timeButton: {
+        flex: 1,
+    },
+    dateTimeText: {
+        fontSize: typography.body.fontSize,
+        color: colors.text.primary,
+    },
+    dateTimePlaceholder: {
+        fontSize: typography.body.fontSize,
+        color: colors.text.disabled,
+    },
+    // Map Selector
+    mapSelector: {
         marginBottom: spacing.md,
     },
     mapSelectorButton: {
@@ -614,13 +939,23 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
         borderRadius: borderRadius.md,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
+        padding: spacing.md,
         gap: spacing.md,
     },
     mapSelectorButtonSelected: {
         borderColor: colors.success,
-        backgroundColor: colors.success + '10',
+        backgroundColor: colors.success + '08',
+    },
+    mapIconContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    mapIconContainerSelected: {
+        backgroundColor: colors.success + '20',
     },
     mapSelectorTextContainer: {
         flex: 1,
@@ -633,18 +968,18 @@ const styles = StyleSheet.create({
     mapSelectorTextSelected: {
         color: colors.success,
     },
+    mapSelectorHint: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
+        marginTop: 2,
+    },
     coordinatesText: {
         fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
         marginTop: 2,
     },
-    helperText: {
-        fontSize: typography.caption.fontSize,
-        color: colors.text.secondary,
-        marginTop: spacing.xs,
-    },
-    // Visibility
-    visibilityContainer: {
+    // Settings
+    settingItem: {
         marginBottom: spacing.md,
     },
     visibilityButtons: {
@@ -653,7 +988,6 @@ const styles = StyleSheet.create({
     },
     visibilityOption: {
         flex: 1,
-        flexDirection: 'row',
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.md,
         borderRadius: borderRadius.md,
@@ -661,21 +995,25 @@ const styles = StyleSheet.create({
         borderColor: colors.border,
         backgroundColor: colors.surface,
         alignItems: 'center',
-        justifyContent: 'center',
         gap: spacing.xs,
     },
     visibilitySelected: {
         borderColor: colors.primary,
-        backgroundColor: colors.primary + '10',
+        backgroundColor: colors.primary + '08',
     },
     visibilityText: {
         fontSize: typography.body.fontSize,
+        fontWeight: '600',
         color: colors.text.secondary,
     },
     visibilityTextSelected: {
         color: colors.primary,
-        fontWeight: '600',
     },
+    visibilityHint: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.disabled,
+    },
+    // Buttons
     buttonContainer: {
         flexDirection: 'row',
         gap: spacing.md,
@@ -696,35 +1034,60 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: borderRadius.xl,
         borderTopRightRadius: borderRadius.xl,
         padding: spacing.lg,
-        maxHeight: '70%',
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.lg,
     },
     modalTitle: {
         fontSize: typography.h3.fontSize,
         fontWeight: typography.h3.fontWeight,
         color: colors.text.primary,
-        marginBottom: spacing.lg,
     },
     categoryOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingVertical: spacing.md,
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: spacing.sm,
         borderRadius: borderRadius.md,
         marginBottom: spacing.sm,
         backgroundColor: colors.background,
+        gap: spacing.md,
     },
     categoryOptionSelected: {
-        backgroundColor: colors.primary + '15',
-        borderWidth: 1.5,
+        backgroundColor: colors.primary + '10',
+        borderWidth: 1,
         borderColor: colors.primary,
+    },
+    categoryOptionIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    categoryOptionIconSelected: {
+        backgroundColor: colors.primaryLight,
+    },
+    categoryOptionContent: {
+        flex: 1,
     },
     categoryOptionText: {
         fontSize: typography.body.fontSize,
         fontWeight: '600',
         color: colors.text.primary,
     },
+    categoryOptionTextSelected: {
+        color: colors.primary,
+    },
     categoryDescription: {
-        fontSize: typography.bodySmall.fontSize,
+        fontSize: typography.caption.fontSize,
         color: colors.text.secondary,
-        marginTop: spacing.xs,
+        marginTop: 2,
     },
     // Map Modal
     mapModalContainer: {
