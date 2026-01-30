@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,31 +9,35 @@ import {
     Platform,
     Alert,
     TouchableOpacity,
+    Animated,
+    ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { MainStackParamList } from '../navigation/AppNavigator';
 import type { Comment } from '../types/models';
 import { commentService } from '../services/commentService';
 import { CommentItem } from '../components/CommentItem';
-import { Button } from '../components/Button';
 import { Loading } from '../components/Loading';
 import { useAuth } from '../contexts/AuthContext';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 
 type CommentsRouteProp = RouteProp<MainStackParamList, 'Comments'>;
 
 export const CommentsScreen: React.FC = () => {
     const route = useRoute<CommentsRouteProp>();
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const { eventId, eventTitle } = route.params;
+    const inputRef = useRef<TextInput>(null);
 
     const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [newComment, setNewComment] = useState('');
+    const [isInputFocused, setIsInputFocused] = useState(false);
 
     useEffect(() => {
         loadComments();
@@ -67,7 +71,6 @@ export const CommentsScreen: React.FC = () => {
             const comment = await commentService.addComment(eventId, newComment.trim());
             setComments([comment, ...comments]);
             setNewComment('');
-            Alert.alert('Éxito', 'Comentario agregado');
         } catch (error: any) {
             console.error('Error adding comment:', error);
             Alert.alert('Error', error.message || 'No se pudo agregar el comentario');
@@ -80,7 +83,6 @@ export const CommentsScreen: React.FC = () => {
         try {
             await commentService.deleteComment(commentId);
             setComments(comments.filter(c => c.id !== commentId));
-            Alert.alert('Éxito', 'Comentario eliminado');
         } catch (error: any) {
             console.error('Error deleting comment:', error);
             Alert.alert('Error', 'No se pudo eliminar el comentario');
@@ -88,19 +90,44 @@ export const CommentsScreen: React.FC = () => {
     };
 
     const renderHeader = () => (
-        <View style={styles.header}>
-            <Text style={styles.eventTitle}>{eventTitle}</Text>
-            <Text style={styles.commentsCount}>
-                {comments.length} {comments.length === 1 ? 'comentario' : 'comentarios'}
-            </Text>
+        <View style={styles.listHeader}>
+            <View style={styles.eventInfoCard}>
+                <View style={styles.eventIconContainer}>
+                    <Ionicons name="calendar" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.eventInfoText}>
+                    <Text style={styles.eventLabel}>Evento</Text>
+                    <Text style={styles.eventTitle} numberOfLines={2}>{eventTitle}</Text>
+                </View>
+            </View>
+
+            <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{comments.length}</Text>
+                    <Text style={styles.statLabel}>
+                        {comments.length === 1 ? 'comentario' : 'comentarios'}
+                    </Text>
+                </View>
+            </View>
         </View>
     );
 
     const renderEmpty = () => (
         <View style={styles.emptyState}>
-            <Ionicons name="chatbubble-outline" size={64} color={colors.text.disabled} />
-            <Text style={styles.emptyTitle}>No hay comentarios</Text>
-            <Text style={styles.emptyText}>Sé el primero en comentar sobre este evento</Text>
+            <View style={styles.emptyIconContainer}>
+                <Ionicons name="chatbubbles-outline" size={48} color={colors.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Sin comentarios</Text>
+            <Text style={styles.emptyText}>
+                Sé el primero en compartir tu opinión sobre este evento
+            </Text>
+            <TouchableOpacity
+                style={styles.emptyAction}
+                onPress={() => inputRef.current?.focus()}
+            >
+                <Ionicons name="create-outline" size={18} color={colors.primary} />
+                <Text style={styles.emptyActionText}>Escribir comentario</Text>
+            </TouchableOpacity>
         </View>
     );
 
@@ -109,66 +136,101 @@ export const CommentsScreen: React.FC = () => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.container}>
             {/* Header */}
-            <View style={styles.screenHeader}>
+            <View style={[styles.header, { paddingTop: insets.top }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
                     <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
                 </TouchableOpacity>
-                <Text style={styles.screenTitle}>Comentarios</Text>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitle}>Comentarios</Text>
+                    {comments.length > 0 && (
+                        <View style={styles.commentCountBadge}>
+                            <Text style={styles.commentCountText}>{comments.length}</Text>
+                        </View>
+                    )}
+                </View>
                 <View style={styles.headerSpacer} />
             </View>
 
             <KeyboardAvoidingView
                 style={styles.keyboardContainer}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={100}
+                keyboardVerticalOffset={0}
             >
                 <FlatList
                     data={comments}
                     keyExtractor={(item) => item.id.toString()}
-                    renderItem={({ item }) => (
+                    renderItem={({ item, index }) => (
                         <CommentItem
                             comment={item}
                             canDelete={item.isOwner}
                             onDelete={() => handleDeleteComment(item.id)}
+                            isFirst={index === 0}
                         />
                     )}
                     ListHeaderComponent={renderHeader}
                     ListEmptyComponent={renderEmpty}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={[
+                        styles.listContent,
+                        comments.length === 0 && styles.listContentEmpty
+                    ]}
+                    showsVerticalScrollIndicator={false}
                 />
 
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Escribe un comentario..."
-                        placeholderTextColor={colors.text.disabled}
-                        value={newComment}
-                        onChangeText={setNewComment}
-                        multiline
-                        maxLength={500}
-                    />
+                {/* Input Container */}
+                <View style={[
+                    styles.inputContainer,
+                    { paddingBottom: insets.bottom + spacing.sm },
+                    isInputFocused && styles.inputContainerFocused
+                ]}>
+                    <View style={[
+                        styles.inputWrapper,
+                        isInputFocused && styles.inputWrapperFocused
+                    ]}>
+                        <TextInput
+                            ref={inputRef}
+                            style={styles.input}
+                            placeholder="Escribe un comentario..."
+                            placeholderTextColor={colors.text.disabled}
+                            value={newComment}
+                            onChangeText={setNewComment}
+                            onFocus={() => setIsInputFocused(true)}
+                            onBlur={() => setIsInputFocused(false)}
+                            multiline
+                            maxLength={500}
+                        />
+                        {newComment.length > 0 && (
+                            <Text style={styles.charCount}>
+                                {newComment.length}/500
+                            </Text>
+                        )}
+                    </View>
+
                     <TouchableOpacity
                         onPress={handleAddComment}
                         disabled={submitting || !newComment.trim()}
                         style={[
                             styles.sendButton,
-                            (!newComment.trim() || submitting) && styles.sendButtonDisabled
+                            newComment.trim() && !submitting && styles.sendButtonActive
                         ]}
                     >
-                        <Ionicons
-                            name="send"
-                            size={24}
-                            color={newComment.trim() && !submitting ? colors.primary : colors.text.disabled}
-                        />
+                        {submitting ? (
+                            <ActivityIndicator size="small" color={colors.text.inverse} />
+                        ) : (
+                            <Ionicons
+                                name="send"
+                                size={20}
+                                color={newComment.trim() ? colors.text.inverse : colors.text.disabled}
+                            />
+                        )}
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
-        </SafeAreaView>
+        </View>
     );
 };
 
@@ -177,26 +239,48 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
-    screenHeader: {
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
+        paddingBottom: spacing.md,
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
     backButton: {
-        padding: spacing.xs,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    screenTitle: {
+    headerTitleContainer: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+    },
+    headerTitle: {
         fontSize: typography.h3.fontSize,
-        fontWeight: typography.h3.fontWeight,
+        fontWeight: '700',
         color: colors.text.primary,
-        textAlign: 'center',
+    },
+    commentCountBadge: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+        borderRadius: borderRadius.full,
+    },
+    commentCountText: {
+        fontSize: typography.caption.fontSize,
+        fontWeight: '700',
+        color: colors.text.inverse,
     },
     headerSpacer: {
-        width: 32,
+        width: 40,
     },
     keyboardContainer: {
         flex: 1,
@@ -204,57 +288,157 @@ const styles = StyleSheet.create({
     listContent: {
         padding: spacing.lg,
     },
-    header: {
+    listContentEmpty: {
+        flexGrow: 1,
+    },
+    // List Header
+    listHeader: {
         marginBottom: spacing.lg,
     },
-    eventTitle: {
-        fontSize: typography.h3.fontSize,
-        fontWeight: typography.h3.fontWeight,
-        color: colors.text.primary,
-        marginBottom: spacing.xs,
+    eventInfoCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        padding: spacing.md,
+        borderRadius: borderRadius.lg,
+        gap: spacing.md,
+        marginBottom: spacing.md,
+        ...shadows.sm,
     },
-    commentsCount: {
+    eventIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    eventInfoText: {
+        flex: 1,
+    },
+    eventLabel: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.secondary,
+        marginBottom: 2,
+    },
+    eventTitle: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '600',
+        color: colors.text.primary,
+    },
+    statsRow: {
+        flexDirection: 'row',
+    },
+    statItem: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: spacing.xs,
+    },
+    statValue: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    statLabel: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
     },
+    // Empty State
     emptyState: {
         alignItems: 'center',
         paddingVertical: spacing.xxl,
+        paddingHorizontal: spacing.lg,
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.lg,
     },
     emptyTitle: {
         fontSize: typography.h3.fontSize,
-        fontWeight: '600',
+        fontWeight: '700',
         color: colors.text.primary,
-        marginTop: spacing.md,
+        marginBottom: spacing.xs,
     },
     emptyText: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
         textAlign: 'center',
-        marginTop: spacing.xs,
+        marginBottom: spacing.lg,
+        lineHeight: 22,
     },
+    emptyAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        backgroundColor: colors.primaryLight,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+    },
+    emptyActionText: {
+        fontSize: typography.body.fontSize,
+        fontWeight: '600',
+        color: colors.primary,
+    },
+    // Input
     inputContainer: {
         flexDirection: 'row',
-        padding: spacing.md,
+        alignItems: 'flex-end',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.md,
         backgroundColor: colors.surface,
         borderTopWidth: 1,
         borderTopColor: colors.border,
-        alignItems: 'center',
         gap: spacing.sm,
     },
-    input: {
+    inputContainerFocused: {
+        borderTopColor: colors.primary,
+    },
+    inputWrapper: {
         flex: 1,
         backgroundColor: colors.background,
-        borderRadius: borderRadius.md,
-        padding: spacing.md,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1.5,
+        borderColor: colors.border,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+    },
+    inputWrapperFocused: {
+        borderColor: colors.primary,
+        backgroundColor: colors.surface,
+    },
+    input: {
         fontSize: typography.body.fontSize,
         color: colors.text.primary,
         maxHeight: 100,
+        minHeight: 24,
+    },
+    charCount: {
+        fontSize: typography.caption.fontSize,
+        color: colors.text.disabled,
+        textAlign: 'right',
+        marginTop: spacing.xs,
     },
     sendButton: {
-        padding: spacing.sm,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.text.disabled,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 2,
     },
-    sendButtonDisabled: {
-        opacity: 0.5,
+    sendButtonActive: {
+        backgroundColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
 });

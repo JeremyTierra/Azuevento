@@ -49,6 +49,7 @@ export const ENDPOINTS = {
     EVENT_ARCHIVE: (id: number) => `/events/${id}/archive`,
     EVENT_SEARCH: '/events/search',
     MY_EVENTS: '/events/my-events',
+    ATTENDING_EVENTS: '/events/attending',
 
     // Categories
     CATEGORIES: '/categories',

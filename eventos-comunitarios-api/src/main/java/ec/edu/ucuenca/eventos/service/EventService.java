@@ -184,8 +184,22 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<EventResponse> getMyEvents(Long userId) {
         List<Event> events = eventRepository.findByOrganizerIdAndDeletedAtIsNull(userId);
-        
+
         return events.stream()
+                .map(event -> mapToEventResponse(event, userId))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<EventResponse> getAttendingEvents(Long userId) {
+        // Get all participations for this user
+        List<Participant> participations = participantRepository.findByUserId(userId);
+
+        // Map to events, filtering out deleted events and events where user is organizer
+        return participations.stream()
+                .map(Participant::getEvent)
+                .filter(event -> event.getDeletedAt() == null)
+                .filter(event -> !event.getOrganizer().getId().equals(userId))
                 .map(event -> mapToEventResponse(event, userId))
                 .collect(Collectors.toList());
     }

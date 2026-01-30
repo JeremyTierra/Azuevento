@@ -13,7 +13,7 @@ import {
     Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ExploreStackParamList } from '../navigation/TabNavigator';
 import { eventService } from '../services/eventService';
@@ -40,9 +40,12 @@ export const HomeScreen: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    // Reload data when screen gains focus (e.g., after creating an event)
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [])
+    );
 
     useEffect(() => {
         filterEvents();
