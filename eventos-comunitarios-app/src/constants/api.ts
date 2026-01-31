@@ -56,6 +56,9 @@ export const ENDPOINTS = {
 
     // Participants
     ATTENDANCE: (eventId: number) => `/events/${eventId}/attendance`,
+    MY_TICKET: (eventId: number) => `/events/${eventId}/my-ticket`,
+    CHECKIN: (eventId: number) => `/events/${eventId}/checkin`,
+    ATTENDANCE_LIST: (eventId: number) => `/events/${eventId}/attendance-list`,
 
     // Comments
     COMMENTS: (eventId: number) => `/events/${eventId}/comments`,

@@ -12,6 +12,8 @@ import { MapScreen } from '../screens/MapScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import { MyTicketScreen } from '../screens/MyTicketScreen';
+import { ScannerScreen } from '../screens/ScannerScreen';
 import { colors } from '../theme';
 
 // Stack navigation types for each tab
@@ -20,6 +22,7 @@ export type ExploreStackParamList = {
     EventDetail: { eventId: number };
     CreateEvent: undefined;
     Comments: { eventId: number; eventTitle: string };
+    MyTicket: { eventId: number; eventTitle: string };
 };
 
 export type MapStackParamList = {
@@ -33,6 +36,8 @@ export type MyEventsStackParamList = {
     EventDetail: { eventId: number };
     CreateEvent: undefined;
     Comments: { eventId: number; eventTitle: string };
+    MyTicket: { eventId: number; eventTitle: string };
+    Scanner: { eventId: number; eventTitle: string };
 };
 
 export type TabParamList = {
@@ -77,6 +82,10 @@ const ExploreNavigator = () => {
             <ExploreStack.Screen
                 name="Comments"
                 component={CommentsScreen}
+            />
+            <ExploreStack.Screen
+                name="MyTicket"
+                component={MyTicketScreen}
             />
         </ExploreStack.Navigator>
     );
@@ -129,6 +138,14 @@ const MyEventsNavigator = () => {
             <MyEventsStack.Screen
                 name="Comments"
                 component={CommentsScreen}
+            />
+            <MyEventsStack.Screen
+                name="MyTicket"
+                component={MyTicketScreen}
+            />
+            <MyEventsStack.Screen
+                name="Scanner"
+                component={ScannerScreen}
             />
         </MyEventsStack.Navigator>
     );

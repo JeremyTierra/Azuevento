@@ -381,14 +381,44 @@ export const EventDetailScreen: React.FC = () => {
                     </TouchableOpacity>
 
                     {event.hasUserRegistered && (
+                        <>
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => setShowRatingModal(true)}
+                            >
+                                <View style={[styles.actionButtonIcon, { backgroundColor: colors.warning + '12' }]}>
+                                    <Ionicons name="star-outline" size={22} color={colors.warning} />
+                                </View>
+                                <Text style={styles.actionButtonText}>Calificar</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => navigation.navigate('MyTicket', {
+                                    eventId: event.id,
+                                    eventTitle: event.title
+                                })}
+                            >
+                                <View style={[styles.actionButtonIcon, { backgroundColor: colors.accent + '12' }]}>
+                                    <Ionicons name="qr-code-outline" size={22} color={colors.accent} />
+                                </View>
+                                <Text style={styles.actionButtonText}>Mi Entrada</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+
+                    {isOrganizer && (
                         <TouchableOpacity
                             style={styles.actionButton}
-                            onPress={() => setShowRatingModal(true)}
+                            onPress={() => navigation.navigate('Scanner' as any, {
+                                eventId: event.id,
+                                eventTitle: event.title
+                            })}
                         >
-                            <View style={[styles.actionButtonIcon, { backgroundColor: colors.warning + '12' }]}>
-                                <Ionicons name="star-outline" size={22} color={colors.warning} />
+                            <View style={[styles.actionButtonIcon, { backgroundColor: colors.secondary + '12' }]}>
+                                <Ionicons name="scan-outline" size={22} color={colors.secondary} />
                             </View>
-                            <Text style={styles.actionButtonText}>Calificar</Text>
+                            <Text style={styles.actionButtonText}>Escanear</Text>
                         </TouchableOpacity>
                     )}
 

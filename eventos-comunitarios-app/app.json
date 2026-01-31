@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "eventos-comunitarios-app",
-    "slug": "eventos-comunitarios-app",
+    "name": "Azuevento",
+    "slug": "azuevento",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.azuevento.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +22,22 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.azuevento.app",
+      "versionCode": 1,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBSOnt4NJmQETTKMHeP0JqRImO8zUE2XFY"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bfeeeea5-9520-45c8-9d9b-154f3a476b85"
+      }
+    },
+    "owner": "jeremy_tierra"
   }
 }
