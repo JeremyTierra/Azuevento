@@ -33,7 +33,14 @@ public class Participant {
     @Column(nullable = false, name = "attendance_status", length = 20)
     @Builder.Default
     private AttendanceStatus attendanceStatus = AttendanceStatus.CONFIRMED;
-    
+
+    // QR Check-in fields
+    @Column(name = "checkin_token", length = 64, unique = true)
+    private String checkinToken;
+
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
+
     // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)

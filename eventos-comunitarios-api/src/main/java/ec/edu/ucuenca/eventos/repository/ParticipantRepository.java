@@ -17,6 +17,11 @@ public interface ParticipantRepository extends JpaRepository<Participant, Long> 
     List<Participant> findByUserId(Long userId);
     
     Boolean existsByEventIdAndUserId(Long eventId, Long userId);
-    
+
     Long countByEventId(Long eventId);
+
+    // QR Check-in methods
+    Optional<Participant> findByCheckinToken(String checkinToken);
+
+    Optional<Participant> findByEventIdAndCheckinToken(Long eventId, String checkinToken);
 }
