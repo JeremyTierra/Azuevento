@@ -44,6 +44,8 @@
 - user_id
 - registration_date
 - attendance_status (confirmed | cancelled | attended | not_attended)
+- checkin_token (UUID único para código QR)
+- checked_in_at (timestamp de check-in)
 
 ## Favorite
 - id

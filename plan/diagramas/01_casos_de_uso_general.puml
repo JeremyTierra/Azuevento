@@ -1,0 +1,112 @@
+@startuml Casos_de_Uso_General
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #FEFECE
+skinparam usecaseBorderColor #A80036
+skinparam actorBackgroundColor #FEFECE
+skinparam actorBorderColor #A80036
+
+title Diagrama de Casos de Uso - Sistema de Gestion de Eventos Comunitarios
+
+left to right direction
+
+actor "Usuario\nNo Registrado" as Guest
+actor "Usuario\nRegistrado" as User
+actor "Organizador" as Organizer
+
+rectangle "Sistema de Eventos Comunitarios" {
+
+    package "Autenticacion" {
+        usecase "UC-01\nRegistrar cuenta" as UC01
+        usecase "UC-02\nIniciar sesion" as UC02
+        usecase "UC-03\nCerrar sesion" as UC03
+    }
+
+    package "Gestion de Perfil" {
+        usecase "UC-04\nEditar perfil" as UC04
+        usecase "UC-05\nCambiar contrasena" as UC05
+    }
+
+    package "Exploracion de Eventos" {
+        usecase "UC-06\nVisualizar eventos publicos" as UC06
+        usecase "UC-07\nBuscar eventos" as UC07
+        usecase "UC-08\nFiltrar por categoria" as UC08
+        usecase "UC-09\nVer eventos en mapa" as UC09
+        usecase "UC-10\nVer detalle de evento" as UC10
+        usecase "UC-11\nObtener indicaciones" as UC11
+    }
+
+    package "Gestion de Eventos" {
+        usecase "UC-12\nCrear evento" as UC12
+        usecase "UC-13\nEditar evento" as UC13
+        usecase "UC-14\nEliminar evento" as UC14
+        usecase "UC-15\nPublicar evento" as UC15
+        usecase "UC-16\nCancelar evento" as UC16
+        usecase "UC-17\nArchivar evento" as UC17
+    }
+
+    package "Participacion" {
+        usecase "UC-18\nRegistrar asistencia" as UC18
+        usecase "UC-19\nCancelar asistencia" as UC19
+        usecase "UC-20\nVer mi entrada (QR)" as UC20
+        usecase "UC-21\nCompartir evento" as UC21
+    }
+
+    package "Interaccion Social" {
+        usecase "UC-22\nMarcar favorito" as UC22
+        usecase "UC-23\nComentar evento" as UC23
+        usecase "UC-24\nValorar evento" as UC24
+    }
+
+    package "Control de Asistencia" {
+        usecase "UC-25\nEscanear codigo QR" as UC25
+        usecase "UC-26\nVer lista de asistencia" as UC26
+        usecase "UC-27\nRegistrar check-in" as UC27
+    }
+}
+
+' Relaciones Usuario No Registrado
+Guest --> UC01
+Guest --> UC02
+Guest --> UC06
+Guest --> UC07
+Guest --> UC08
+Guest --> UC09
+Guest --> UC10
+
+' Relaciones Usuario Registrado
+User --> UC03
+User --> UC04
+User --> UC05
+User --> UC06
+User --> UC07
+User --> UC08
+User --> UC09
+User --> UC10
+User --> UC11
+User --> UC12
+User --> UC18
+User --> UC19
+User --> UC20
+User --> UC21
+User --> UC22
+User --> UC23
+User --> UC24
+
+' Relaciones Organizador (hereda de Usuario)
+User <|-- Organizer
+Organizer --> UC13
+Organizer --> UC14
+Organizer --> UC15
+Organizer --> UC16
+Organizer --> UC17
+Organizer --> UC25
+Organizer --> UC26
+Organizer --> UC27
+
+' Extensiones e inclusiones
+UC07 ..> UC08 : <<include>>
+UC10 ..> UC11 : <<extend>>
+UC18 ..> UC20 : <<include>>
+UC25 ..> UC27 : <<include>>
+
+@enduml

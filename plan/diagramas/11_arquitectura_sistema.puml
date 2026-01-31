@@ -1,0 +1,85 @@
+@startuml Arquitectura_Sistema
+skinparam componentStyle uml2
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+skinparam packageBackgroundColor #FFFFFF
+skinparam componentBackgroundColor #FEFECE
+skinparam databaseBackgroundColor #FEFECE
+
+title Arquitectura del Sistema - Aplicacion de Eventos Comunitarios
+
+package "Capa de Presentacion" <<Cloud>> #E3F2FD {
+    package "Aplicacion Movil (React Native / Expo)" #BBDEFB {
+        [Navegacion\n(React Navigation)] as Navigation
+        [Contexto de\nAutenticacion] as AuthContext
+        [Servicios HTTP\n(API Client)] as Services
+        [Componentes UI] as Components
+    }
+}
+
+package "Capa de Servicios" <<Frame>> #E8F5E9 {
+    package "API REST (Spring Boot)" #C8E6C9 {
+        [Controladores\n(REST Controllers)] as Controllers
+        [Servicios de\nNegocio] as BusinessServices
+        [Repositorios\n(Spring Data JPA)] as Repositories
+        [Seguridad\n(JWT Filter)] as Security
+    }
+
+    [Swagger / OpenAPI\nDocumentacion] as Swagger
+}
+
+package "Capa de Datos" <<Database>> #FFF9C4 {
+    database "PostgreSQL" as DB
+}
+
+package "Servicios Externos" <<Rectangle>> #FCE4EC {
+    [Google Maps / Apple Maps\n(Navegacion externa)] as ExternalMaps
+    [API Nativa de\nCompartir (Share)] as ShareAPI
+}
+
+' Conexiones entre capas
+Services --> Controllers : HTTPS / REST\nJSON
+Repositories --> DB : JDBC /\nSpring Data
+Controllers --> Swagger : Genera\ndocumentacion
+
+' Conexiones internas - Presentación
+Navigation --> AuthContext
+AuthContext --> Services
+Components --> Services
+
+' Conexiones internas - Servicios
+Security --> Controllers : Filtra\nrequests
+Controllers --> BusinessServices
+BusinessServices --> Repositories
+
+' Conexiones externas
+Navigation --> ExternalMaps : Deep Link\n(lat/lng)
+Components --> ShareAPI : Invocacion\nnativa
+
+note right of DB
+  **Tablas principales:**
+  users, events, categories,
+  participants, favorites,
+  comments, ratings,
+  user_interests
+
+  **Caracteristicas:**
+  * Borrado logico (soft delete)
+  * Restricciones de integridad
+  * Timestamps automaticos
+end note
+
+note bottom of Security
+  **Mecanismos:**
+  * JWT Authentication
+  * BCrypt Hashing
+  * CORS Config
+  * Role-based Access
+end note
+
+note top of Navigation
+  **Plataformas:**
+  Android / iOS
+end note
+
+@enduml

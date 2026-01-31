@@ -1,0 +1,143 @@
+@startuml Flujo_Interaccion_Social
+skinparam activityBackgroundColor #FEFECE
+skinparam activityBorderColor #A80036
+skinparam activityDiamondBackgroundColor #FEFECE
+skinparam activityDiamondBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Actividades - Interaccion Social en Eventos
+
+|Usuario|
+start
+
+:Acceder al detalle del evento;
+
+fork
+
+partition "Gestion de Favoritos" #LightYellow {
+    :Pulsar icono de favorito;
+
+    |Sistema|
+    :Verificar estado actual;
+
+    if (¿Es favorito?) then (si)
+        :Eliminar de favoritos;
+        :Decrementar contador;
+
+        |Usuario|
+        :Actualizar icono (vacio);
+    else (no)
+        :Agregar a favoritos;
+        :Incrementar contador;
+
+        |Usuario|
+        :Actualizar icono (lleno);
+    endif
+
+    :Lista de favoritos actualizada;
+}
+
+fork again
+
+partition "Sistema de Comentarios" #LightBlue {
+    :Acceder a seccion de comentarios;
+
+    |Sistema|
+    :Cargar comentarios del evento;
+    :Ordenar por fecha (recientes primero);
+
+    |Usuario|
+    :Visualizar comentarios existentes;
+
+    if (¿Desea comentar?) then (si)
+        :Escribir comentario;
+        :Enviar comentario;
+
+        |Sistema|
+        :Validar contenido;
+        :Crear registro de comentario;
+        :Asociar usuario y evento;
+
+        |Usuario|
+        :Comentario publicado;
+    else (no)
+        :Continuar lectura;
+    endif
+
+    if (¿Es autor del comentario?) then (si)
+        fork
+            :Editar comentario;
+
+            |Sistema|
+            :Actualizar contenido;
+            :Registrar updated_at;
+        fork again
+            :Eliminar comentario;
+
+            |Sistema|
+            :Eliminar registro;
+        end fork
+    endif
+}
+
+fork again
+
+partition "Sistema de Valoraciones" #LightGreen {
+    |Usuario|
+    :Verificar elegibilidad para valorar;
+
+    |Sistema|
+    if (¿Esta autenticado?) then (si)
+        :Habilitar opcion de valoracion;
+
+        |Usuario|
+        :Seleccionar calificacion (1-5 estrellas);
+
+        |Sistema|
+        :Verificar valoracion previa;
+
+        if (¿Ya valoro?) then (si)
+            :Actualizar valoracion existente;
+        else (no)
+            :Crear nueva valoracion;
+        endif
+
+        :Recalcular promedio del evento;
+        :Actualizar contador de valoraciones;
+
+        |Usuario|
+        :Mostrar confirmacion;
+        :Actualizar promedio visible;
+    else (no)
+        |Usuario|
+        :Mostrar mensaje\n"Inicia sesion para valorar";
+    endif
+}
+
+fork again
+
+partition "Compartir Evento" #LightPink {
+    :Pulsar boton compartir;
+
+    |Sistema|
+    :Generar contenido para compartir;
+    note right
+      Contenido incluye:
+      * Titulo del evento
+      * Fecha y hora
+      * Ubicacion
+      * Descripcion breve
+    end note
+
+    :Invocar API nativa de compartir;
+
+    |Usuario|
+    :Seleccionar aplicacion destino;
+    :Enviar contenido;
+}
+
+end fork
+
+stop
+
+@enduml

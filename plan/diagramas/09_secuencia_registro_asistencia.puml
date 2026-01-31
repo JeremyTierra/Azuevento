@@ -1,0 +1,111 @@
+@startuml Secuencia_Registro_Asistencia
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+
+title Diagrama de Secuencia - Registro de Asistencia a Evento
+
+actor "Usuario" as User
+participant "App Movil\n(React Native)" as App
+participant "API REST\n(Spring Boot)" as API
+database "PostgreSQL" as DB
+
+== Consulta de Evento ==
+
+User -> App: Seleccionar evento
+activate App
+
+App -> API: GET /api/events/{eventId}\nAuthorization: Bearer {token}
+activate API
+
+API -> DB: SELECT * FROM events\nWHERE id = {eventId}
+activate DB
+DB --> API: Event data
+deactivate DB
+
+API -> DB: SELECT COUNT(*) FROM participants\nWHERE event_id = {eventId}
+activate DB
+DB --> API: participant_count
+deactivate DB
+
+API -> DB: SELECT * FROM participants\nWHERE event_id = {eventId}\nAND user_id = {userId}
+activate DB
+DB --> API: participant (or null)
+deactivate DB
+
+API --> App: EventResponse\n{event, hasUserRegistered, participantCount}
+deactivate API
+
+App --> User: Mostrar detalle del evento
+deactivate App
+
+== Registro de Asistencia ==
+
+User -> App: Pulsar "Inscribirse"
+activate App
+
+App -> API: POST /api/events/{eventId}/attendance\nAuthorization: Bearer {token}
+activate API
+
+API -> API: Extraer userId del JWT
+
+API -> DB: SELECT status FROM events\nWHERE id = {eventId}
+activate DB
+DB --> API: status = 'PUBLISHED'
+deactivate DB
+
+alt Evento no publicado
+    API --> App: 400 Bad Request\n"Evento no disponible"
+end
+
+API -> DB: SELECT * FROM participants\nWHERE event_id = {eventId}\nAND user_id = {userId}
+activate DB
+DB --> API: null (no existe)
+deactivate DB
+
+alt Ya registrado
+    API --> App: 400 Bad Request\n"Ya esta registrado"
+end
+
+API -> DB: SELECT COUNT(*), max_capacity\nFROM events e\nLEFT JOIN participants p\nON e.id = p.event_id\nWHERE e.id = {eventId}
+activate DB
+DB --> API: count, max_capacity
+deactivate DB
+
+alt Evento lleno
+    API --> App: 400 Bad Request\n"Evento sin cupo disponible"
+end
+
+API -> API: Generar UUID para checkin_token
+
+API -> DB: INSERT INTO participants\n(event_id, user_id, checkin_token,\nattendance_status, registration_date)\nVALUES (...)
+activate DB
+DB --> API: Participant created
+deactivate DB
+
+API --> App: 200 OK\n{message: "Inscripcion exitosa"}
+deactivate API
+
+App --> User: Mostrar confirmacion\ny boton "Mi Entrada"
+deactivate App
+
+== Cancelacion de Asistencia ==
+
+User -> App: Pulsar "Cancelar asistencia"
+activate App
+
+App -> API: DELETE /api/events/{eventId}/attendance\nAuthorization: Bearer {token}
+activate API
+
+API -> DB: UPDATE participants\nSET attendance_status = 'CANCELLED'\nWHERE event_id = {eventId}\nAND user_id = {userId}
+activate DB
+DB --> API: Updated
+deactivate DB
+
+API --> App: 200 OK\n{message: "Asistencia cancelada"}
+deactivate API
+
+App --> User: Actualizar UI\nMostrar "Inscribirse"
+deactivate App
+
+@enduml

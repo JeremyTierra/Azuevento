@@ -1,0 +1,76 @@
+@startuml Flujo_Participacion
+skinparam activityBackgroundColor #FEFECE
+skinparam activityBorderColor #A80036
+skinparam activityDiamondBackgroundColor #FEFECE
+skinparam activityDiamondBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Actividades - Registro de Asistencia a Eventos
+
+|Participante|
+start
+
+:Explorar eventos disponibles;
+
+:Seleccionar evento de interes;
+
+|Sistema|
+:Cargar detalle del evento;
+:Verificar estado del evento;
+
+if (¿Estado = PUBLISHED?) then (si)
+    |Participante|
+    :Visualizar informacion del evento;
+
+    if (¿Usuario autenticado?) then (si)
+        |Sistema|
+        :Verificar registro previo;
+
+        if (¿Ya esta registrado?) then (si)
+            |Participante|
+            :Mostrar opcion "Cancelar asistencia";
+
+            if (¿Desea cancelar?) then (si)
+                |Sistema|
+                :Actualizar estado a CANCELLED;
+                :Decrementar contador de participantes;
+
+                |Participante|
+                :Confirmar cancelacion;
+            else (no)
+                :Mantener registro;
+            endif
+        else (no)
+            :Mostrar boton "Inscribirse";
+
+            if (¿Desea inscribirse?) then (si)
+                |Sistema|
+                :Crear registro de participante;
+                :Generar checkin_token (UUID);
+                :Establecer estado CONFIRMED;
+                :Incrementar contador de participantes;
+
+                |Participante|
+                :Confirmar inscripcion exitosa;
+                :Habilitar acceso a "Mi Entrada";
+            else (no)
+                :Continuar explorando;
+            endif
+        endif
+    else (no)
+        :Mostrar mensaje\n"Inicia sesion para inscribirte";
+        :Redirigir a login;
+    endif
+else (no)
+    |Participante|
+    if (¿Estado = CANCELLED?) then (si)
+        :Mostrar banner "Evento cancelado";
+    else (ARCHIVED)
+        :Mostrar banner "Evento finalizado";
+    endif
+    :Deshabilitar inscripcion;
+endif
+
+stop
+
+@enduml

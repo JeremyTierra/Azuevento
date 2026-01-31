@@ -1,0 +1,108 @@
+@startuml Secuencia_CheckIn
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+
+title Diagrama de Secuencia - Check-in mediante Codigo QR
+
+actor "Participante" as Participant
+actor "Organizador" as Organizer
+participant "App Participante\n(React Native)" as AppP
+participant "App Organizador\n(React Native)" as AppO
+participant "API REST\n(Spring Boot)" as API
+database "PostgreSQL" as DB
+
+== Generacion de Entrada QR ==
+
+Participant -> AppP: Acceder a "Mi Entrada"
+activate AppP
+
+AppP -> API: GET /api/events/{eventId}/my-ticket\nAuthorization: Bearer {token}
+activate API
+
+API -> API: Extraer userId del JWT
+
+API -> DB: SELECT p.*, e.title, e.location,\ne.start_date, u.name\nFROM participants p\nJOIN events e ON p.event_id = e.id\nJOIN users u ON p.user_id = u.id\nWHERE p.event_id = {eventId}\nAND p.user_id = {userId}
+activate DB
+DB --> API: TicketData
+deactivate DB
+
+API --> AppP: TicketResponse\n{eventTitle, userName,\ncheckinToken, status}
+deactivate API
+
+AppP -> AppP: Generar codigo QR\ncon checkin_token
+
+AppP --> Participant: Mostrar entrada\ncon codigo QR
+deactivate AppP
+
+== Proceso de Check-in ==
+
+Organizer -> AppO: Acceder a "Escanear"
+activate AppO
+
+AppO -> AppO: Activar camara
+AppO --> Organizer: Mostrar visor de camara
+
+Participant -> Organizer: Presentar codigo QR
+
+AppO -> AppO: Detectar y decodificar QR
+AppO -> AppO: Extraer checkin_token
+
+AppO -> API: POST /api/events/{eventId}/checkin\nAuthorization: Bearer {token}\nBody: {token: "{checkin_token}"}
+activate API
+
+API -> API: Extraer organizerId del JWT
+
+API -> DB: SELECT organizer_id FROM events\nWHERE id = {eventId}
+activate DB
+DB --> API: organizer_id
+deactivate DB
+
+alt No es organizador
+    API --> AppO: 403 Forbidden\n"No autorizado"
+end
+
+API -> DB: SELECT p.*, u.name, u.email\nFROM participants p\nJOIN users u ON p.user_id = u.id\nWHERE p.event_id = {eventId}\nAND p.checkin_token = {token}
+activate DB
+DB --> API: Participant data
+deactivate DB
+
+alt Token no encontrado
+    API --> AppO: 404 Not Found\n"Codigo QR invalido"
+end
+
+alt Ya hizo check-in
+    API --> AppO: 400 Bad Request\n"Participante ya registrado"\n{checkedInAt: "..."}
+end
+
+API -> DB: UPDATE participants\nSET attendance_status = 'ATTENDED',\nchecked_in_at = NOW()\nWHERE id = {participantId}
+activate DB
+DB --> API: Updated
+deactivate DB
+
+API --> AppO: CheckinResponse\n{success: true,\nuserName: "...",\ncheckedInAt: "..."}
+deactivate API
+
+AppO --> Organizer: Mostrar confirmacion\ncon nombre del participante
+deactivate AppO
+
+== Consulta de Lista de Asistencia ==
+
+Organizer -> AppO: Ver lista de asistencia
+activate AppO
+
+AppO -> API: GET /api/events/{eventId}/attendance-list\nAuthorization: Bearer {token}
+activate API
+
+API -> DB: SELECT p.*, u.name, u.email\nFROM participants p\nJOIN users u ON p.user_id = u.id\nWHERE p.event_id = {eventId}\nORDER BY p.checked_in_at DESC
+activate DB
+DB --> API: List<Participant>
+deactivate DB
+
+API --> AppO: List<AttendanceItemResponse>\n[{userName, status, checkedInAt}, ...]
+deactivate API
+
+AppO --> Organizer: Mostrar lista de asistentes\ncon estado de check-in
+deactivate AppO
+
+@enduml

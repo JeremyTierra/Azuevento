@@ -1,0 +1,125 @@
+@startuml Flujo_Gestion_Eventos
+skinparam activityBackgroundColor #FEFECE
+skinparam activityBorderColor #A80036
+skinparam activityDiamondBackgroundColor #FEFECE
+skinparam activityDiamondBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Actividades - Gestion del Ciclo de Vida de Eventos
+
+|Organizador|
+start
+
+:Acceder a "Crear Evento";
+
+:Ingresar datos del evento;
+note right
+  * Titulo
+  * Descripcion
+  * Fecha/hora inicio y fin
+  * Ubicacion (texto)
+  * Coordenadas (lat/lng)
+  * Categoria
+  * Capacidad maxima
+  * Imagen de portada
+  * Visibilidad (publico/privado)
+end note
+
+|Sistema|
+:Validar datos obligatorios;
+
+if (¿Datos validos?) then (si)
+    :Crear evento con estado DRAFT;
+    :Asignar organizador;
+    :Almacenar en base de datos;
+
+    |Organizador|
+    :Mostrar evento creado;
+
+    if (¿Publicar ahora?) then (si)
+        |Sistema|
+        :Validar requisitos de publicacion;
+        note right
+          * Fecha futura
+          * Ubicacion valida
+          * Campos completos
+        end note
+
+        if (¿Cumple requisitos?) then (si)
+            :Cambiar estado a PUBLISHED;
+            :Evento visible publicamente;
+
+            |Organizador|
+            :Confirmar publicacion exitosa;
+        else (no)
+            |Organizador|
+            :Mostrar errores de validacion;
+            :Mantener como DRAFT;
+        endif
+    else (no)
+        :Mantener como borrador;
+        :Evento guardado para edicion posterior;
+    endif
+else (no)
+    |Organizador|
+    :Mostrar errores de validacion;
+    :Corregir datos;
+endif
+
+fork
+    :Editar evento;
+
+    |Sistema|
+    :Verificar permisos de edicion;
+
+    if (¿Es organizador?) then (si)
+        :Permitir modificaciones;
+        :Actualizar evento;
+    else (no)
+        |Organizador|
+        :Denegar acceso;
+    endif
+fork again
+    :Cancelar evento;
+
+    |Sistema|
+    if (¿Estado = PUBLISHED?) then (si)
+        :Cambiar estado a CANCELLED;
+        :Bloquear nuevas inscripciones;
+        :Conservar participantes registrados;
+
+        |Organizador|
+        :Evento marcado como cancelado;
+    else (no)
+        |Organizador|
+        :Acción no permitida;
+    endif
+fork again
+    :Archivar evento;
+
+    |Sistema|
+    if (¿Estado = PUBLISHED o CANCELLED?) then (si)
+        :Cambiar estado a ARCHIVED;
+        :Evento ya no visible en exploracion;
+
+        |Organizador|
+        :Evento archivado;
+    else (no)
+        |Organizador|
+        :Acción no permitida;
+    endif
+fork again
+    :Eliminar evento;
+
+    |Sistema|
+    :Aplicar borrado logico;
+    :Establecer deleted_at = NOW();
+    :Evento oculto de todos los listados;
+
+    |Organizador|
+    :Evento eliminado;
+end fork
+
+stop
+
+@enduml

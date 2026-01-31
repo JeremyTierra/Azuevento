@@ -1,0 +1,81 @@
+@startuml Estados_Evento
+skinparam stateBackgroundColor #FEFECE
+skinparam stateBorderColor #A80036
+skinparam arrowColor #A80036
+
+title Diagrama de Estados - Ciclo de Vida del Evento
+
+[*] --> DRAFT : Evento creado
+
+state DRAFT {
+    state "Borrador" as draft_internal
+    draft_internal : El evento esta en edicion
+    draft_internal : No es visible publicamente
+    draft_internal : Solo el organizador puede verlo
+}
+
+state PUBLISHED {
+    state "Publicado" as pub_internal
+    pub_internal : Evento visible segun visibilidad
+    pub_internal : Acepta inscripciones
+    pub_internal : Visible en mapa y exploracion
+}
+
+state CANCELLED {
+    state "Cancelado" as cancel_internal
+    cancel_internal : Evento marcado como cancelado
+    cancel_internal : No acepta nuevas inscripciones
+    cancel_internal : Participantes existentes conservados
+    cancel_internal : Visible con indicador de cancelacion
+}
+
+state ARCHIVED {
+    state "Archivado" as arch_internal
+    arch_internal : Evento finalizado o archivado
+    arch_internal : No visible en exploracion activa
+    arch_internal : Accesible desde historial
+    arch_internal : Conserva datos para estadisticas
+}
+
+state DELETED {
+    state "Eliminado (Logico)" as del_internal
+    del_internal : deleted_at != NULL
+    del_internal : No visible en ningun listado
+    del_internal : Datos conservados en BD
+}
+
+DRAFT --> PUBLISHED : publicar()\n[status = DRAFT]
+DRAFT --> DELETED : eliminar()
+
+PUBLISHED --> CANCELLED : cancelar()
+PUBLISHED --> ARCHIVED : archivar()
+PUBLISHED --> DELETED : eliminar()
+
+CANCELLED --> ARCHIVED : archivar()
+CANCELLED --> DELETED : eliminar()
+
+ARCHIVED --> DELETED : eliminar()
+
+note right of DRAFT
+  **Transiciones permitidas:**
+  - Editar datos
+  - Publicar
+  - Eliminar
+end note
+
+note right of PUBLISHED
+  **Acciones disponibles:**
+  - Inscribirse/cancelar asistencia
+  - Comentar y valorar
+  - Marcar favorito
+  - Check-in (dia del evento)
+end note
+
+note bottom of CANCELLED
+  **Impacto:**
+  Los participantes ven el evento
+  como cancelado pero conservan
+  su registro de inscripcion
+end note
+
+@enduml

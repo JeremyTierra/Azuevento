@@ -76,9 +76,36 @@ RF-20 Valoraciones de eventos (MVP)
 - Permitir calificar eventos (1-5 estrellas) después de asistir.
 - Una valoración por usuario-evento.
 
-RF-21 Creación de eventos con coorganizadores (Deseable)
+## Check-in y control de asistencia
+RF-21 Generación de ticket/entrada con código QR (MVP)
+- Generar código QR único para cada participante registrado.
+- El QR contiene un token único (checkin_token) para validación.
+- Mostrar información del evento en la pantalla del ticket.
+
+RF-22 Escaneo de códigos QR para check-in (MVP)
+- Permitir al organizador escanear códigos QR de participantes.
+- Validar token y marcar asistencia como "attended".
+- Mostrar confirmación visual con nombre del participante.
+- Prevenir check-in duplicado.
+
+RF-23 Lista de asistencia para organizadores (MVP)
+- Visualizar lista completa de participantes registrados.
+- Mostrar estado de check-in (pendiente/confirmado).
+- Filtrar por estado de asistencia.
+
+## Compartir
+RF-24 Compartir evento (MVP)
+- Compartir evento mediante funcionalidad nativa del dispositivo.
+- Incluir título, ubicación, fecha y descripción breve.
+
+## Gestión de cuenta
+RF-25 Cambiar contraseña (MVP)
+- Permitir al usuario cambiar su contraseña desde el perfil.
+- Validar contraseña actual antes de permitir el cambio.
+
+RF-26 Creación de eventos con coorganizadores (Deseable)
 - Invitar coorganizadores con permisos para editar y gestionar asistentes.
 
 ## Administración
-RF-22 Panel de administración de eventos (Deseable)
+RF-27 Panel de administración de eventos (Deseable)
 - Moderar eventos: ocultar/eliminar, aprobar (opcional), gestionar reportes.

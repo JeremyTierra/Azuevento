@@ -1,0 +1,145 @@
+@startuml Modelo_Entidad_Relacion
+skinparam linetype ortho
+skinparam classBackgroundColor #FEFECE
+skinparam classBorderColor #A80036
+
+title Diagrama Entidad-Relacion - Base de Datos del Sistema
+
+entity "users" as users {
+    * **id** : BIGSERIAL <<PK>>
+    --
+    * name : VARCHAR(100)
+    * email : VARCHAR(150) <<UNIQUE>>
+    * password_hash : VARCHAR(255)
+    phone : VARCHAR(20)
+    profile_picture : VARCHAR(255)
+    description : TEXT
+    * role : VARCHAR(20)
+    * registration_date : TIMESTAMP
+    * active : BOOLEAN
+}
+
+entity "categories" as categories {
+    * **id** : BIGSERIAL <<PK>>
+    --
+    * name : VARCHAR(50) <<UNIQUE>>
+    description : TEXT
+    icon : VARCHAR(100)
+}
+
+entity "events" as events {
+    * **id** : BIGSERIAL <<PK>>
+    --
+    * title : VARCHAR(200)
+    * description : TEXT
+    * start_date : TIMESTAMP
+    * end_date : TIMESTAMP
+    * location : VARCHAR(255)
+    latitude : DECIMAL(10,8)
+    longitude : DECIMAL(11,8)
+    max_capacity : INTEGER
+    cover_image : VARCHAR(255)
+    * visibility : VARCHAR(20)
+    * status : VARCHAR(20)
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+    deleted_at : TIMESTAMP
+    --
+    * category_id : BIGINT <<FK>>
+    * organizer_id : BIGINT <<FK>>
+}
+
+entity "participants" as participants {
+    * **id** : BIGSERIAL <<PK>>
+    --
+    * registration_date : TIMESTAMP
+    * attendance_status : VARCHAR(20)
+    checkin_token : VARCHAR(64) <<UNIQUE>>
+    checked_in_at : TIMESTAMP
+    --
+    * event_id : BIGINT <<FK>>
+    * user_id : BIGINT <<FK>>
+}
+
+entity "favorites" as favorites {
+    * **id** : BIGSERIAL <<PK>>
+    --
+    * created_at : TIMESTAMP
+    --
+    * event_id : BIGINT <<FK>>
+    * user_id : BIGINT <<FK>>
+}
+
+entity "comments" as comments {
+    * **id** : BIGSERIAL <<PK>>
+    --
+    * content : TEXT
+    * created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    --
+    * event_id : BIGINT <<FK>>
+    * user_id : BIGINT <<FK>>
+}
+
+entity "ratings" as ratings {
+    * **id** : BIGSERIAL <<PK>>
+    --
+    * score : INTEGER
+    comment : TEXT
+    * created_at : TIMESTAMP
+    --
+    * event_id : BIGINT <<FK>>
+    * user_id : BIGINT <<FK>>
+}
+
+entity "user_interests" as user_interests {
+    * **user_id** : BIGINT <<PK, FK>>
+    * **category_id** : BIGINT <<PK, FK>>
+}
+
+' Relaciones
+users ||--o{ events : "organiza (1:N)"
+users ||--o{ participants : "participa (1:N)"
+users ||--o{ favorites : "favoritos (1:N)"
+users ||--o{ comments : "comenta (1:N)"
+users ||--o{ ratings : "valora (1:N)"
+users ||--o{ user_interests : "intereses (N:M)"
+
+categories ||--o{ events : "categoriza (1:N)"
+categories ||--o{ user_interests : "intereses (N:M)"
+
+events ||--o{ participants : "asistentes (1:N)"
+events ||--o{ favorites : "favoritos (1:N)"
+events ||--o{ comments : "comentarios (1:N)"
+events ||--o{ ratings : "valoraciones (1:N)"
+
+note right of events
+  **Estados (status):**
+  * DRAFT
+  * PUBLISHED
+  * CANCELLED
+  * ARCHIVED
+
+  **Visibilidad:**
+  * PUBLIC
+  * PRIVATE
+end note
+
+note right of participants
+  **Estados de asistencia:**
+  * CONFIRMED
+  * CANCELLED
+  * ATTENDED
+  * NOT_ATTENDED
+
+  **Restricción:**
+  UNIQUE(event_id, user_id)
+end note
+
+note bottom of ratings
+  **Restricciones:**
+  * score: 1-5
+  * UNIQUE(event_id, user_id)
+end note
+
+@enduml
