@@ -47,36 +47,36 @@ const DEFAULT_REGION = {
 
 // Función para obtener color según categoría
 const getCategoryColor = (categoryName: string | undefined): string => {
-    if (!categoryName) return '#3b82f6'; // Azul por defecto
+    if (!categoryName) return '#7FB3F0'; // primaryLight por defecto
     
     const categoryColors: Record<string, string> = {
-        // Inglés (nombres del backend)
-        'Sports': '#f97316',
-        'Music': '#a855f7',
-        'Culture': '#ec4899',
-        'Technology': '#3b82f6',
-        'Education': '#0ea5e9',
-        'Gastronomy': '#eab308',
-        'Social': '#22c55e',
-        'Business': '#64748b',
-        'Health': '#16a34a',
-        'Nature': '#059669',
-        'Entertainment': '#8b5cf6',
-        'Other': '#6b7280',
+        // Colores que armonizan con el tema Azul Cuenca (#4A90E2), Terracota (#E07B39), Dorado (#F4B942)
+        'Sports': '#F0A066',       // secondaryLight - Terracota claro
+        'Music': '#A78BFA',        // Púrpura suave compatible
+        'Culture': '#F0A066',      // secondaryLight - Terracota 
+        'Technology': '#7FB3F0',   // primaryLight - Azul Cuenca claro
+        'Education': '#7FB3F0',    // primaryLight - Azul Cuenca claro
+        'Gastronomy': '#F7CC6F',   // accentLight - Dorado claro
+        'Social': '#6BCF91',       // Verde suave compatible con success
+        'Business': '#94A3B8',     // text.disabled - Gris neutro
+        'Health': '#6BCF91',       // Verde suave
+        'Nature': '#6BCF91',       // Verde suave
+        'Entertainment': '#C96A2E', // secondaryDark - Terracota oscuro
+        'Other': '#94A3B8',        // text.disabled - Gris neutro
         
         // Español (por si acaso)
-        'Deportes': '#f97316',
-        'Música': '#a855f7',
-        'Cultura': '#ec4899',
-        'Tecnología': '#3b82f6',
-        'Educación': '#0ea5e9',
-        'Gastronomía': '#eab308',
-        'Social': '#22c55e',
-        'Negocios': '#64748b',
-        'Salud': '#16a34a',
-        'Naturaleza': '#059669',
-        'Entretenimiento': '#8b5cf6',
-        'Otro': '#6b7280',
+        'Deportes': '#F0A066',
+        'Música': '#A78BFA',
+        'Cultura': '#F0A066',
+        'Tecnología': '#7FB3F0',
+        'Educación': '#7FB3F0',
+        'Gastronomía': '#F7CC6F',
+        'Social': '#6BCF91',
+        'Negocios': '#94A3B8',
+        'Salud': '#6BCF91',
+        'Naturaleza': '#6BCF91',
+        'Entretenimiento': '#C96A2E',
+        'Otro': '#94A3B8',
     };
     
     // Buscar coincidencia exacta
@@ -92,7 +92,7 @@ const getCategoryColor = (categoryName: string | undefined): string => {
         }
     }
     
-    return '#3b82f6'; // Azul por defecto
+    return '#7FB3F0'; // primaryLight por defecto
 };
 
 type MapScreenNavigationProp = NativeStackNavigationProp<MapStackParamList, 'MapMain'>;
@@ -517,14 +517,9 @@ export const MapScreen: React.FC = () => {
                     const categoryColor = getCategoryColor(event.categoryName);
                     const markerColor = isSelected ? '#22c55e' : categoryColor;
                     
-                    // Log temporal para debug
-                    if (event.id === filteredEvents[0]?.id) {
-                        console.log('🎨 Primer evento:', event.categoryName, '→', categoryColor);
-                    }
-                    
                     return (
                         <Marker
-                            key={`${event.id}-${isSelected}`}
+                            key={`${event.id}-${markerColor}`}
                             coordinate={{
                                 latitude: event.latitude!,
                                 longitude: event.longitude!,

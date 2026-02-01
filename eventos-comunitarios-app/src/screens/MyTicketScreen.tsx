@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,10 +8,13 @@ import {
     Alert,
     ScrollView,
 } from 'react-native';
+import ViewShot from 'react-native-view-shot';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { colors, spacing, borderRadius, typography, shadows } from '../theme';
 import { participantService } from '../services/participantService';
 
@@ -38,11 +41,12 @@ interface TicketData {
 export const MyTicketScreen = () => {
     const navigation = useNavigation();
     const route = useRoute<RouteProp<RouteParams, 'MyTicket'>>();
-    const { eventId, eventTitle } = route.params;
+    const { eventId } = route.params;
 
     const [loading, setLoading] = useState(true);
     const [ticket, setTicket] = useState<TicketData | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const viewShotRef = useRef<ViewShot>(null);
 
     useEffect(() => {
         loadTicket();
@@ -110,6 +114,33 @@ export const MyTicketScreen = () => {
         };
     };
 
+    const handleShareQr = async () => {
+        if (!ticket || !viewShotRef.current) return;
+
+        try {
+            // Capturar el QR como imagen usando ViewShot
+            const uri = await viewShotRef.current.capture();
+            
+            if (!uri) {
+                throw new Error('No se pudo capturar el QR');
+            }
+
+            // Compartir la imagen
+            await Sharing.shareAsync(uri, {
+                mimeType: 'image/png',
+                dialogTitle: `Ticket - ${ticket.eventTitle}`,
+            });
+
+        } catch (err: any) {
+            console.error('Error sharing QR:', err);
+            Alert.alert(
+                'Error al compartir', 
+                err.message || 'No se pudo compartir el QR. Intenta nuevamente.',
+                [{ text: 'OK' }]
+            );
+        }
+    };
+
     if (loading) {
         return (
             <SafeAreaView style={styles.container}>
@@ -149,7 +180,6 @@ export const MyTicketScreen = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
@@ -166,78 +196,76 @@ export const MyTicketScreen = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Ticket Card */}
-                <View style={styles.ticketCard}>
-                    {/* Status Badge */}
-                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
-                        <Ionicons name={statusInfo.icon} size={18} color={statusInfo.color} />
-                        <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                            {statusInfo.text}
-                        </Text>
-                    </View>
+                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }}>
+                    <View style={styles.ticketCard}>
+                        <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
+                            <Ionicons name={statusInfo.icon} size={18} color={statusInfo.color} />
+                            <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                                {statusInfo.text}
+                            </Text>
+                        </View>
 
-                    {/* Event Title */}
-                    <Text style={styles.eventTitle}>{ticket.eventTitle}</Text>
+                        <Text style={styles.eventTitle}>{ticket.eventTitle}</Text>
 
-                    {/* Event Info Cards */}
-                    <View style={styles.infoCardsContainer}>
-                        <View style={styles.infoCard}>
-                            <View style={[styles.infoCardIcon, { backgroundColor: colors.primary + '15' }]}>
-                                <Ionicons name="location" size={18} color={colors.primary} />
+                        <View style={styles.infoCardsContainer}>
+                            <View style={styles.infoCard}>
+                                <View style={[styles.infoCardIcon, { backgroundColor: colors.primary + '15' }]}>
+                                    <Ionicons name="location" size={18} color={colors.primary} />
+                                </View>
+                                <View style={styles.infoCardContent}>
+                                    <Text style={styles.infoCardLabel}>Ubicación</Text>
+                                    <Text style={styles.infoCardValue} numberOfLines={2}>
+                                        {ticket.eventLocation}
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={styles.infoCardContent}>
-                                <Text style={styles.infoCardLabel}>Ubicación</Text>
-                                <Text style={styles.infoCardValue} numberOfLines={2}>
-                                    {ticket.eventLocation}
-                                </Text>
+
+                            <View style={styles.infoCard}>
+                                <View style={[styles.infoCardIcon, { backgroundColor: colors.secondary + '15' }]}>
+                                    <Ionicons name="calendar" size={18} color={colors.secondary} />
+                                </View>
+                                <View style={styles.infoCardContent}>
+                                    <Text style={styles.infoCardLabel}>Fecha y hora</Text>
+                                    <Text style={styles.infoCardValue}>
+                                        {formatShortDate(ticket.eventStartDate)}, {formatTime(ticket.eventStartDate)}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.dividerCircleLeft} />
+                            <View style={styles.dividerDashed} />
+                            <View style={styles.dividerCircleRight} />
+                        </View>
+
+                        <View style={styles.qrSection}>
+                            <View style={styles.qrContainer}>
+                                <QRCode
+                                    value={ticket.checkinToken}
+                                    size={180}
+                                    color="#FFFFFF"
+                                    backgroundColor={colors.primary}
+                                />
                             </View>
                         </View>
 
-                        <View style={styles.infoCard}>
-                            <View style={[styles.infoCardIcon, { backgroundColor: colors.secondary + '15' }]}>
-                                <Ionicons name="calendar" size={18} color={colors.secondary} />
+                        <View style={styles.userSection}>
+                            <View style={styles.userAvatar}>
+                                <Ionicons name="person" size={20} color={colors.primary} />
                             </View>
-                            <View style={styles.infoCardContent}>
-                                <Text style={styles.infoCardLabel}>Fecha y hora</Text>
-                                <Text style={styles.infoCardValue}>
-                                    {formatShortDate(ticket.eventStartDate)}, {formatTime(ticket.eventStartDate)}
-                                </Text>
-                            </View>
+                            <Text style={styles.userName}>{ticket.userName}</Text>
                         </View>
+
+                        <Text style={styles.instructionText}>{statusInfo.subtext}</Text>
                     </View>
+                </ViewShot>
 
-                    {/* Divider with ticket perforation effect */}
-                    <View style={styles.dividerContainer}>
-                        <View style={styles.dividerCircleLeft} />
-                        <View style={styles.dividerDashed} />
-                        <View style={styles.dividerCircleRight} />
-                    </View>
+                <TouchableOpacity style={styles.shareButtonLarge} onPress={handleShareQr}>
+                    <Ionicons name="share-social" size={24} color={colors.text.inverse} />
+                    <Text style={styles.shareButtonLargeText}>Compartir Entrada</Text>
+                </TouchableOpacity>
 
-                    {/* QR Code Section */}
-                    <View style={styles.qrSection}>
-                        <View style={styles.qrContainer}>
-                            <QRCode
-                                value={ticket.checkinToken}
-                                size={180}
-                                color="#FFFFFF"
-                                backgroundColor={colors.primary}
-                            />
-                        </View>
-                    </View>
-
-                    {/* User Info */}
-                    <View style={styles.userSection}>
-                        <View style={styles.userAvatar}>
-                            <Ionicons name="person" size={20} color={colors.primary} />
-                        </View>
-                        <Text style={styles.userName}>{ticket.userName}</Text>
-                    </View>
-
-                    {/* Instruction */}
-                    <Text style={styles.instructionText}>{statusInfo.subtext}</Text>
-                </View>
-
-                {/* Additional Info Section */}
                 <View style={styles.additionalInfo}>
                     <Text style={styles.additionalInfoTitle}>Detalles de la entrada</Text>
 
@@ -258,7 +286,6 @@ export const MyTicketScreen = () => {
                     </View>
                 </View>
 
-                {/* Bottom Info */}
                 <View style={styles.bottomInfo}>
                     <Ionicons name="information-circle-outline" size={20} color={colors.text.secondary} />
                     <Text style={styles.bottomInfoText}>
@@ -431,12 +458,29 @@ const styles = StyleSheet.create({
     qrSection: {
         alignItems: 'center',
         marginBottom: spacing.lg,
+        width: '100%',
     },
     qrContainer: {
         padding: spacing.md,
         backgroundColor: colors.primary,
         borderRadius: borderRadius.xl,
         ...shadows.md,
+    },
+    shareButton: {
+        marginTop: spacing.md,
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.full,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        ...shadows.sm,
+    },
+    shareButtonText: {
+        ...typography.bodySmall,
+        color: colors.text.inverse,
+        fontWeight: '600',
     },
     userSection: {
         flexDirection: 'row',
@@ -460,6 +504,23 @@ const styles = StyleSheet.create({
         ...typography.bodySmall,
         color: colors.primary,
         fontWeight: '500',
+    },
+    shareButtonLarge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary,
+        marginHorizontal: spacing.md,
+        marginTop: spacing.lg,
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        gap: spacing.sm,
+        ...shadows.md,
+    },
+    shareButtonLargeText: {
+        ...typography.body,
+        color: colors.text.inverse,
+        fontWeight: '600',
     },
     additionalInfo: {
         marginHorizontal: spacing.md,
