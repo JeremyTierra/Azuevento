@@ -23,6 +23,7 @@ export type ExploreStackParamList = {
     CreateEvent: undefined;
     Comments: { eventId: number; eventTitle: string };
     MyTicket: { eventId: number; eventTitle: string };
+    Scanner: { eventId: number; eventTitle: string };
 };
 
 export type MapStackParamList = {
@@ -86,6 +87,10 @@ const ExploreNavigator = () => {
             <ExploreStack.Screen
                 name="MyTicket"
                 component={MyTicketScreen}
+            />
+            <ExploreStack.Screen
+                name="Scanner"
+                component={ScannerScreen}
             />
         </ExploreStack.Navigator>
     );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,8 @@ import {
     ScrollView,
     Alert,
     TouchableOpacity,
+    Image,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +19,7 @@ import type { AuthStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing, typography, shadows, borderRadius } from '../theme';
 
 type LoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -67,6 +69,9 @@ export const LoginScreen: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <View style={styles.backgroundOrbTop} pointerEvents="none" />
+            <View style={styles.backgroundOrbBottom} pointerEvents="none" />
             <KeyboardAvoidingView
                 style={styles.container}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -76,25 +81,37 @@ export const LoginScreen: React.FC = () => {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.header}>
+                        <View style={styles.logoHalo}>
+                            <Image
+                                source={require('../../assets/logo.png')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
+                            <View style={styles.logoBadge}>
+                                <Ionicons name="sparkles" size={16} color={colors.primary} />
+                            </View>
+                        </View>
                         <View style={styles.logoContainer}>
-                            <Ionicons name="calendar" size={48} color={colors.primary} />
                             <Text style={styles.logoText}>Azuevento</Text>
                         </View>
-                        <Text style={styles.title}>Bienvenido</Text>
-                        <Text style={styles.subtitle}>
-                            Inicia sesión para descubrir eventos increíbles
-                        </Text>
+                        <Text style={styles.tagline}>Eventos de tu comunidad</Text>
                     </View>
 
-                    <View style={styles.form}>
+                    <View style={styles.card}>
+                        <Text style={styles.title}>Bienvenido de nuevo</Text>
+                        <Text style={styles.subtitle}>
+                            Ingresa tus credenciales para continuar
+                        </Text>
+
                         <Input
-                            label="Email"
-                            placeholder="tu@email.com"
+                            label="Correo electrónico"
+                            placeholder="ejemplo@correo.com"
                             value={email}
                             onChangeText={(text) => {
                                 setEmail(text);
                                 setErrors({ ...errors, email: undefined });
                             }}
+                            icon="mail-outline"
                             error={errors.email}
                             keyboardType="email-address"
                             autoCapitalize="none"
@@ -109,6 +126,7 @@ export const LoginScreen: React.FC = () => {
                                 setPassword(text);
                                 setErrors({ ...errors, password: undefined });
                             }}
+                            icon="lock-closed-outline"
                             error={errors.password}
                             secureTextEntry
                             autoCapitalize="none"
@@ -119,11 +137,8 @@ export const LoginScreen: React.FC = () => {
                             onPress={handleLogin}
                             loading={loading}
                             fullWidth
+                            style={styles.primaryButton}
                         />
-
-                        <TouchableOpacity style={styles.forgotPassword}>
-                            <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
-                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.footer}>
@@ -149,50 +164,104 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
-        padding: spacing.lg,
-        justifyContent: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.xxl,
+    },
+    backgroundOrbTop: {
+        position: 'absolute',
+        top: -140,
+        right: -80,
+        width: 220,
+        height: 220,
+        borderRadius: 110,
+        backgroundColor: colors.primaryLight,
+        opacity: 0.1,
+    },
+    backgroundOrbBottom: {
+        position: 'absolute',
+        bottom: -180,
+        left: -100,
+        width: 260,
+        height: 260,
+        borderRadius: 130,
+        backgroundColor: colors.primaryLight,
+        opacity: 0.08,
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing.xl,
+        marginBottom: spacing.lg,
+    },
+    logoHalo: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.md,
+        ...shadows.md,
+    },
+    logoImage: {
+        width: 68,
+        height: 68,
+    },
+    logoBadge: {
+        position: 'absolute',
+        bottom: -6,
+        right: -6,
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.full,
+        padding: spacing.xs,
+        borderWidth: 1,
+        borderColor: colors.borderLight,
+        ...shadows.sm,
     },
     logoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-        marginBottom: spacing.lg,
+        gap: spacing.xs,
     },
     logoText: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: '700',
         color: colors.primary,
     },
+    tagline: {
+        fontSize: typography.bodySmall.fontSize,
+        color: colors.text.secondary,
+        marginTop: spacing.xs,
+    },
     title: {
-        fontSize: typography.h2.fontSize,
-        fontWeight: typography.h2.fontWeight,
+        fontSize: typography.h3.fontSize,
+        fontWeight: typography.h3.fontWeight,
         color: colors.text.primary,
+        textAlign: 'center',
     },
     subtitle: {
         fontSize: typography.body.fontSize,
         color: colors.text.secondary,
         textAlign: 'center',
+        marginTop: spacing.xs,
+        marginBottom: spacing.lg,
     },
-    form: {
-        gap: spacing.md,
+    card: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
+        padding: spacing.lg,
+        marginTop: spacing.md,
+        ...shadows.md,
     },
-    forgotPassword: {
-        alignSelf: 'flex-end',
-        marginTop: -spacing.xs,
-    },
-    forgotPasswordText: {
-        fontSize: typography.bodySmall.fontSize,
-        color: colors.primary,
+    primaryButton: {
+        borderRadius: borderRadius.lg,
+        ...shadows.sm,
     },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         gap: spacing.xs,
+        marginTop: spacing.lg,
     },
     footerText: {
         fontSize: typography.body.fontSize,

@@ -4,10 +4,10 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    Alert,
     Animated,
     Vibration,
     Modal,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -29,6 +29,7 @@ interface CheckinResult {
     userName?: string;
     userEmail?: string;
     checkedInAt?: string;
+    firstTime?: boolean;
 }
 
 interface AttendanceItem {
@@ -40,6 +41,18 @@ interface AttendanceItem {
     checkedInAt: string | null;
     hasCheckedIn: boolean;
 }
+
+// Dark theme colors for scanner
+const scannerColors = {
+    background: '#0F172A',
+    surface: '#1E293B',
+    surfaceLight: '#334155',
+    text: '#F8FAFC',
+    textSecondary: '#94A3B8',
+    primary: colors.primary,
+    success: '#22C55E',
+    error: '#EF4444',
+};
 
 export const ScannerScreen = () => {
     const navigation = useNavigation();
@@ -54,11 +67,14 @@ export const ScannerScreen = () => {
     const [showAttendanceList, setShowAttendanceList] = useState(false);
     const [attendanceList, setAttendanceList] = useState<AttendanceItem[]>([]);
     const [stats, setStats] = useState({ total: 0, checkedIn: 0 });
+    const [flashOn, setFlashOn] = useState(false);
 
     const scanLineAnim = useRef(new Animated.Value(0)).current;
+    const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
         startScanAnimation();
+        startPulseAnimation();
         loadAttendanceList();
     }, []);
 
@@ -73,6 +89,23 @@ export const ScannerScreen = () => {
                 Animated.timing(scanLineAnim, {
                     toValue: 0,
                     duration: 2000,
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    };
+
+    const startPulseAnimation = () => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1.05,
+                    duration: 1000,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 1,
+                    duration: 1000,
                     useNativeDriver: true,
                 }),
             ])
@@ -105,8 +138,9 @@ export const ScannerScreen = () => {
                 userName: response.userName,
                 userEmail: response.userEmail,
                 checkedInAt: response.checkedInAt,
+                firstTime: true,
             });
-            loadAttendanceList(); // Refresh stats
+            loadAttendanceList();
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || 'Error al procesar el código';
             setResult({
@@ -123,6 +157,11 @@ export const ScannerScreen = () => {
         setShowResult(false);
         setResult(null);
         setScanned(false);
+    };
+
+    const getProgressPercentage = () => {
+        if (stats.total === 0) return 0;
+        return (stats.checkedIn / stats.total) * 100;
     };
 
     if (!permission) {
@@ -143,18 +182,22 @@ export const ScannerScreen = () => {
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+                        <Ionicons name="arrow-back" size={24} color={scannerColors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Escáner QR</Text>
+                    <Text style={styles.headerTitle}>Escáner de Entradas</Text>
                     <View style={styles.placeholder} />
                 </View>
                 <View style={styles.centeredContent}>
-                    <Ionicons name="camera-outline" size={64} color={colors.text.secondary} />
+                    <View style={styles.permissionIconContainer}>
+                        <Ionicons name="camera-outline" size={48} color={scannerColors.primary} />
+                    </View>
+                    <Text style={styles.permissionTitle}>Acceso a Cámara</Text>
                     <Text style={styles.messageText}>
-                        Necesitamos acceso a la cámara para escanear códigos QR
+                        Necesitamos acceso a la cámara para escanear los códigos QR de los asistentes
                     </Text>
                     <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-                        <Text style={styles.permissionButtonText}>Permitir acceso a cámara</Text>
+                        <Ionicons name="camera" size={20} color="#FFFFFF" />
+                        <Text style={styles.permissionButtonText}>Permitir acceso</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -163,7 +206,7 @@ export const ScannerScreen = () => {
 
     const scanLineTranslate = scanLineAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, 250],
+        outputRange: [0, 220],
     });
 
     return (
@@ -174,37 +217,42 @@ export const ScannerScreen = () => {
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+                    <Ionicons name="arrow-back" size={24} color={scannerColors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>
-                    {eventTitle}
-                </Text>
+                <Text style={styles.headerTitle}>Escáner de Entradas</Text>
                 <TouchableOpacity
                     style={styles.listButton}
                     onPress={() => setShowAttendanceList(true)}
                 >
-                    <Ionicons name="list" size={24} color={colors.primary} />
+                    <Ionicons name="people" size={22} color={scannerColors.primary} />
                 </TouchableOpacity>
             </View>
 
-            {/* Stats Bar */}
+            {/* Stats Bar with Progress */}
             <View style={styles.statsBar}>
-                <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{stats.checkedIn}</Text>
-                    <Text style={styles.statLabel}>Ingresados</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{stats.total}</Text>
-                    <Text style={styles.statLabel}>Registrados</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: colors.success }]}>
-                        {stats.total > 0 ? Math.round((stats.checkedIn / stats.total) * 100) : 0}%
+                <View style={styles.statsHeader}>
+                    <View style={styles.statsIconContainer}>
+                        <Ionicons name="people" size={18} color={scannerColors.primary} />
+                    </View>
+                    <Text style={styles.statsTitle}>Asistentes</Text>
+                    <Text style={styles.statsCount}>
+                        {stats.checkedIn} / {stats.total}
                     </Text>
-                    <Text style={styles.statLabel}>Asistencia</Text>
                 </View>
+                <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                        <Animated.View
+                            style={[
+                                styles.progressFill,
+                                { width: `${getProgressPercentage()}%` },
+                            ]}
+                        />
+                    </View>
+                    <Text style={styles.progressText}>
+                        {Math.round(getProgressPercentage())}% completado
+                    </Text>
+                </View>
+                <Text style={styles.eventName} numberOfLines={1}>{eventTitle}</Text>
             </View>
 
             {/* Camera */}
@@ -212,6 +260,7 @@ export const ScannerScreen = () => {
                 <CameraView
                     style={styles.camera}
                     facing="back"
+                    enableTorch={flashOn}
                     barcodeScannerSettings={{
                         barcodeTypes: ['qr'],
                     }}
@@ -219,12 +268,15 @@ export const ScannerScreen = () => {
                 >
                     {/* Overlay */}
                     <View style={styles.overlay}>
-                        <View style={styles.overlayRow}>
-                            <View style={styles.overlaySection} />
-                        </View>
+                        <View style={styles.overlayTop} />
                         <View style={styles.overlayCenterRow}>
-                            <View style={styles.overlaySection} />
-                            <View style={styles.scanArea}>
+                            <View style={styles.overlaySide} />
+                            <Animated.View
+                                style={[
+                                    styles.scanArea,
+                                    { transform: [{ scale: pulseAnim }] },
+                                ]}
+                            >
                                 {/* Corner brackets */}
                                 <View style={[styles.corner, styles.cornerTopLeft]} />
                                 <View style={[styles.corner, styles.cornerTopRight]} />
@@ -237,22 +289,27 @@ export const ScannerScreen = () => {
                                         { transform: [{ translateY: scanLineTranslate }] },
                                     ]}
                                 />
-                            </View>
-                            <View style={styles.overlaySection} />
+                            </Animated.View>
+                            <View style={styles.overlaySide} />
                         </View>
-                        <View style={styles.overlayRow}>
-                            <View style={styles.overlaySection} />
+                        <View style={styles.overlayBottom}>
+                            {/* Flash toggle */}
+                            <TouchableOpacity
+                                style={[styles.flashButton, flashOn && styles.flashButtonActive]}
+                                onPress={() => setFlashOn(!flashOn)}
+                            >
+                                <Ionicons
+                                    name={flashOn ? 'flash' : 'flash-outline'}
+                                    size={24}
+                                    color={flashOn ? scannerColors.background : scannerColors.text}
+                                />
+                            </TouchableOpacity>
+                            <Text style={styles.scanInstructions}>
+                                Apunta al código QR de la entrada
+                            </Text>
                         </View>
                     </View>
                 </CameraView>
-            </View>
-
-            {/* Instructions */}
-            <View style={styles.instructions}>
-                <Ionicons name="qr-code-outline" size={24} color={colors.primary} />
-                <Text style={styles.instructionText}>
-                    Escanea el código QR del asistente
-                </Text>
             </View>
 
             {/* Result Modal */}
@@ -266,27 +323,41 @@ export const ScannerScreen = () => {
                     <View style={styles.resultCard}>
                         {result?.success ? (
                             <>
-                                <View style={styles.successIcon}>
-                                    <Ionicons name="checkmark-circle" size={64} color={colors.success} />
+                                <View style={styles.successIconContainer}>
+                                    <Ionicons name="checkmark" size={40} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.resultTitle}>Check-in Exitoso</Text>
-                                <Text style={styles.resultName}>{result.userName}</Text>
-                                <Text style={styles.resultEmail}>{result.userEmail}</Text>
+                                <Text style={styles.resultTitle}>Check-in exitoso</Text>
+                                <Text style={styles.resultSubtitle}>Entrada validada correctamente</Text>
+
+                                <View style={styles.userCard}>
+                                    <View style={styles.userAvatar}>
+                                        <Ionicons name="person" size={24} color={scannerColors.primary} />
+                                    </View>
+                                    <View style={styles.userInfo}>
+                                        <Text style={styles.userName}>{result.userName}</Text>
+                                        {result.firstTime && (
+                                            <View style={styles.firstTimeBadge}>
+                                                <Text style={styles.firstTimeBadgeText}>PRIMERA VEZ</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
                             </>
                         ) : (
                             <>
-                                <View style={styles.errorIcon}>
-                                    <Ionicons name="close-circle" size={64} color={colors.error} />
+                                <View style={styles.errorIconContainer}>
+                                    <Ionicons name="close" size={40} color="#FFFFFF" />
                                 </View>
                                 <Text style={styles.resultTitle}>Error</Text>
-                                <Text style={styles.resultMessage}>{result?.message}</Text>
+                                <Text style={styles.errorMessage}>{result?.message}</Text>
                             </>
                         )}
                         <TouchableOpacity
                             style={styles.continueButton}
                             onPress={handleContinueScanning}
                         >
-                            <Text style={styles.continueButtonText}>Continuar escaneando</Text>
+                            <Ionicons name="scan" size={20} color="#FFFFFF" />
+                            <Text style={styles.continueButtonText}>Siguiente escaneo</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -301,36 +372,56 @@ export const ScannerScreen = () => {
             >
                 <View style={styles.listModalOverlay}>
                     <View style={styles.listModalContent}>
+                        <View style={styles.listModalHandle} />
                         <View style={styles.listModalHeader}>
-                            <Text style={styles.listModalTitle}>Lista de Asistencia</Text>
-                            <TouchableOpacity onPress={() => setShowAttendanceList(false)}>
+                            <View>
+                                <Text style={styles.listModalTitle}>Lista de Asistencia</Text>
+                                <Text style={styles.listModalSubtitle}>
+                                    {stats.checkedIn} de {stats.total} asistentes
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={() => setShowAttendanceList(false)}
+                            >
                                 <Ionicons name="close" size={24} color={colors.text.primary} />
                             </TouchableOpacity>
                         </View>
-                        <View style={styles.listContainer}>
+                        <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
                             {attendanceList.map((item) => (
                                 <View key={item.participantId} style={styles.attendeeItem}>
+                                    <View style={[
+                                        styles.attendeeAvatar,
+                                        item.hasCheckedIn && styles.attendeeAvatarCheckedIn
+                                    ]}>
+                                        <Text style={styles.attendeeInitial}>
+                                            {item.userName.charAt(0).toUpperCase()}
+                                        </Text>
+                                    </View>
                                     <View style={styles.attendeeInfo}>
                                         <Text style={styles.attendeeName}>{item.userName}</Text>
                                         <Text style={styles.attendeeEmail}>{item.userEmail}</Text>
                                     </View>
                                     {item.hasCheckedIn ? (
                                         <View style={styles.checkedInBadge}>
-                                            <Ionicons name="checkmark" size={16} color={colors.success} />
+                                            <Ionicons name="checkmark-circle" size={24} color={scannerColors.success} />
                                         </View>
                                     ) : (
                                         <View style={styles.pendingBadge}>
-                                            <Ionicons name="time-outline" size={16} color={colors.text.secondary} />
+                                            <Ionicons name="time-outline" size={24} color={colors.text.disabled} />
                                         </View>
                                     )}
                                 </View>
                             ))}
                             {attendanceList.length === 0 && (
-                                <Text style={styles.emptyListText}>
-                                    No hay asistentes registrados
-                                </Text>
+                                <View style={styles.emptyState}>
+                                    <Ionicons name="people-outline" size={48} color={colors.text.disabled} />
+                                    <Text style={styles.emptyStateText}>
+                                        No hay asistentes registrados
+                                    </Text>
+                                </View>
                             )}
-                        </View>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -341,7 +432,7 @@ export const ScannerScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.surfaceDark,
+        backgroundColor: scannerColors.background,
     },
     centeredContent: {
         flex: 1,
@@ -349,22 +440,38 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: spacing.xl,
     },
+    permissionIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: scannerColors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.lg,
+    },
+    permissionTitle: {
+        ...typography.h4,
+        color: scannerColors.text,
+        marginBottom: spacing.sm,
+    },
     messageText: {
         ...typography.body,
-        color: colors.text.secondary,
+        color: scannerColors.textSecondary,
         textAlign: 'center',
-        marginTop: spacing.md,
+        marginBottom: spacing.lg,
     },
     permissionButton: {
-        marginTop: spacing.lg,
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: spacing.xl,
         paddingVertical: spacing.md,
-        backgroundColor: colors.primary,
+        backgroundColor: scannerColors.primary,
         borderRadius: borderRadius.lg,
+        gap: spacing.sm,
     },
     permissionButtonText: {
         ...typography.button,
-        color: colors.text.inverse,
+        color: '#FFFFFF',
     },
     header: {
         flexDirection: 'row',
@@ -372,28 +479,25 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
-        backgroundColor: colors.surface,
+        backgroundColor: scannerColors.surface,
     },
     backButton: {
         width: 40,
         height: 40,
         borderRadius: borderRadius.full,
-        backgroundColor: colors.background,
+        backgroundColor: scannerColors.surfaceLight,
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
         ...typography.h5,
-        color: colors.text.primary,
-        flex: 1,
-        textAlign: 'center',
-        marginHorizontal: spacing.sm,
+        color: scannerColors.text,
     },
     listButton: {
         width: 40,
         height: 40,
         borderRadius: borderRadius.full,
-        backgroundColor: colors.primaryLight + '30',
+        backgroundColor: scannerColors.primary + '20',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -401,29 +505,58 @@ const styles = StyleSheet.create({
         width: 40,
     },
     statsBar: {
-        flexDirection: 'row',
-        backgroundColor: colors.surface,
-        paddingVertical: spacing.md,
+        backgroundColor: scannerColors.surface,
         paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: scannerColors.surfaceLight,
     },
-    statItem: {
-        flex: 1,
+    statsHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: spacing.sm,
     },
-    statNumber: {
-        ...typography.h4,
-        color: colors.primary,
+    statsIconContainer: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: scannerColors.primary + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.sm,
     },
-    statLabel: {
-        ...typography.caption,
-        color: colors.text.secondary,
+    statsTitle: {
+        ...typography.bodySmall,
+        color: scannerColors.textSecondary,
+        flex: 1,
     },
-    statDivider: {
-        width: 1,
+    statsCount: {
+        ...typography.h5,
+        color: scannerColors.text,
+    },
+    progressContainer: {
+        marginBottom: spacing.sm,
+    },
+    progressBar: {
+        height: 6,
+        backgroundColor: scannerColors.surfaceLight,
+        borderRadius: 3,
+        overflow: 'hidden',
+        marginBottom: spacing.xs,
+    },
+    progressFill: {
         height: '100%',
-        backgroundColor: colors.border,
+        backgroundColor: scannerColors.primary,
+        borderRadius: 3,
+    },
+    progressText: {
+        ...typography.caption,
+        color: scannerColors.textSecondary,
+    },
+    eventName: {
+        ...typography.caption,
+        color: scannerColors.primary,
+        fontWeight: '500',
     },
     cameraContainer: {
         flex: 1,
@@ -434,127 +567,190 @@ const styles = StyleSheet.create({
     overlay: {
         flex: 1,
     },
-    overlayRow: {
+    overlayTop: {
         flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
     },
     overlayCenterRow: {
         flexDirection: 'row',
     },
-    overlaySection: {
+    overlaySide: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    },
+    overlayBottom: {
+        flex: 1.2,
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        alignItems: 'center',
+        paddingTop: spacing.xl,
     },
     scanArea: {
-        width: 280,
-        height: 280,
-        borderRadius: borderRadius.lg,
-        overflow: 'hidden',
+        width: 250,
+        height: 250,
+        borderRadius: borderRadius.xl,
     },
     corner: {
         position: 'absolute',
-        width: 30,
-        height: 30,
-        borderColor: colors.primary,
+        width: 40,
+        height: 40,
+        borderColor: scannerColors.primary,
     },
     cornerTopLeft: {
         top: 0,
         left: 0,
         borderTopWidth: 4,
         borderLeftWidth: 4,
-        borderTopLeftRadius: borderRadius.lg,
+        borderTopLeftRadius: borderRadius.xl,
     },
     cornerTopRight: {
         top: 0,
         right: 0,
         borderTopWidth: 4,
         borderRightWidth: 4,
-        borderTopRightRadius: borderRadius.lg,
+        borderTopRightRadius: borderRadius.xl,
     },
     cornerBottomLeft: {
         bottom: 0,
         left: 0,
         borderBottomWidth: 4,
         borderLeftWidth: 4,
-        borderBottomLeftRadius: borderRadius.lg,
+        borderBottomLeftRadius: borderRadius.xl,
     },
     cornerBottomRight: {
         bottom: 0,
         right: 0,
         borderBottomWidth: 4,
         borderRightWidth: 4,
-        borderBottomRightRadius: borderRadius.lg,
+        borderBottomRightRadius: borderRadius.xl,
     },
     scanLine: {
         position: 'absolute',
-        left: 10,
-        right: 10,
-        height: 2,
-        backgroundColor: colors.primary,
+        left: 20,
+        right: 20,
+        height: 3,
+        backgroundColor: scannerColors.primary,
+        borderRadius: 2,
+        ...shadows.sm,
     },
-    instructions: {
-        flexDirection: 'row',
+    flashButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: scannerColors.surfaceLight,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: spacing.lg,
-        backgroundColor: colors.surface,
+        marginBottom: spacing.md,
     },
-    instructionText: {
+    flashButtonActive: {
+        backgroundColor: '#FFFFFF',
+    },
+    scanInstructions: {
         ...typography.body,
-        color: colors.text.primary,
-        marginLeft: spacing.sm,
+        color: scannerColors.text,
+        textAlign: 'center',
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: spacing.lg,
     },
     resultCard: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.xl,
+        backgroundColor: scannerColors.surface,
+        borderRadius: borderRadius.xxl,
         padding: spacing.xl,
         alignItems: 'center',
         width: '100%',
-        maxWidth: 320,
-        ...shadows.lg,
+        maxWidth: 340,
     },
-    successIcon: {
-        marginBottom: spacing.md,
+    successIconContainer: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: scannerColors.success,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.lg,
     },
-    errorIcon: {
-        marginBottom: spacing.md,
+    errorIconContainer: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: scannerColors.error,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.lg,
     },
     resultTitle: {
         ...typography.h4,
-        color: colors.text.primary,
-        marginBottom: spacing.sm,
+        color: scannerColors.text,
+        marginBottom: spacing.xs,
     },
-    resultName: {
-        ...typography.h5,
-        color: colors.text.primary,
-    },
-    resultEmail: {
+    resultSubtitle: {
         ...typography.bodySmall,
-        color: colors.text.secondary,
+        color: scannerColors.textSecondary,
+        marginBottom: spacing.lg,
     },
-    resultMessage: {
+    errorMessage: {
         ...typography.body,
-        color: colors.text.secondary,
+        color: scannerColors.textSecondary,
         textAlign: 'center',
+        marginBottom: spacing.lg,
+    },
+    userCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: scannerColors.surfaceLight,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        width: '100%',
+        marginBottom: spacing.lg,
+    },
+    userAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: scannerColors.primary + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.md,
+    },
+    userInfo: {
+        flex: 1,
+    },
+    userName: {
+        ...typography.h5,
+        color: scannerColors.text,
+    },
+    firstTimeBadge: {
+        backgroundColor: scannerColors.success + '20',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+        borderRadius: borderRadius.sm,
+        alignSelf: 'flex-start',
+        marginTop: spacing.xs,
+    },
+    firstTimeBadgeText: {
+        ...typography.caption,
+        color: scannerColors.success,
+        fontWeight: '700',
+        fontSize: 10,
     },
     continueButton: {
-        marginTop: spacing.lg,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
         paddingHorizontal: spacing.xl,
         paddingVertical: spacing.md,
-        backgroundColor: colors.primary,
+        backgroundColor: scannerColors.primary,
         borderRadius: borderRadius.lg,
         width: '100%',
+        gap: spacing.sm,
     },
     continueButtonText: {
         ...typography.button,
-        color: colors.text.inverse,
-        textAlign: 'center',
+        color: '#FFFFFF',
     },
     listModalOverlay: {
         flex: 1,
@@ -563,9 +759,17 @@ const styles = StyleSheet.create({
     },
     listModalContent: {
         backgroundColor: colors.surface,
-        borderTopLeftRadius: borderRadius.xl,
-        borderTopRightRadius: borderRadius.xl,
-        maxHeight: '80%',
+        borderTopLeftRadius: borderRadius.xxl,
+        borderTopRightRadius: borderRadius.xxl,
+        maxHeight: '85%',
+    },
+    listModalHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: colors.border,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginTop: spacing.sm,
     },
     listModalHeader: {
         flexDirection: 'row',
@@ -579,16 +783,44 @@ const styles = StyleSheet.create({
         ...typography.h5,
         color: colors.text.primary,
     },
+    listModalSubtitle: {
+        ...typography.caption,
+        color: colors.text.secondary,
+        marginTop: 2,
+    },
+    closeButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     listContainer: {
         padding: spacing.md,
     },
     attendeeItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         paddingVertical: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: colors.borderLight,
+    },
+    attendeeAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.md,
+    },
+    attendeeAvatarCheckedIn: {
+        backgroundColor: colors.successLight,
+    },
+    attendeeInitial: {
+        ...typography.h5,
+        color: colors.text.secondary,
     },
     attendeeInfo: {
         flex: 1,
@@ -603,25 +835,19 @@ const styles = StyleSheet.create({
         color: colors.text.secondary,
     },
     checkedInBadge: {
-        width: 32,
-        height: 32,
-        borderRadius: borderRadius.full,
-        backgroundColor: colors.successLight,
-        alignItems: 'center',
-        justifyContent: 'center',
+        marginLeft: spacing.sm,
     },
     pendingBadge: {
-        width: 32,
-        height: 32,
-        borderRadius: borderRadius.full,
-        backgroundColor: colors.background,
-        alignItems: 'center',
-        justifyContent: 'center',
+        marginLeft: spacing.sm,
     },
-    emptyListText: {
+    emptyState: {
+        alignItems: 'center',
+        padding: spacing.xxl,
+    },
+    emptyStateText: {
         ...typography.body,
         color: colors.text.secondary,
         textAlign: 'center',
-        padding: spacing.xl,
+        marginTop: spacing.md,
     },
 });
