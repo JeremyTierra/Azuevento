@@ -23,8 +23,8 @@ export const getApiUrl = () => {
         // Para iOS SIMULATOR, descomentar:
         // return 'http://localhost:8080/api';
     }
-    // Production - reemplazar con URL real
-    return 'https://api.azuevento.com/api';
+    // Production
+    return 'https://azuevento-api.onrender.com/api';
 };
 
 export const API_URL = getApiUrl();
